@@ -1,0 +1,25 @@
+# WooCommerce API Configuration
+NEXT_PUBLIC_WORDPRESS_URL=https://your-wordpress-site.com
+WOOCOMMERCE_GRAPHQL_URL=https://your-wordpress-site.com/graphql
+WOOCOMMERCE_JWT_SECRET=your-jwt-secret-key
+WOOCOMMERCE_WEBHOOK_SECRET=your-webhook-secret-key
+
+# Redis Configuration (for caching and inventory mapping)
+UPSTASH_REDIS_REST_URL=https://your-redis-instance.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your-redis-token
+
+# Revalidation and Synchronization
+WOOCOMMERCE_REVALIDATION_SECRET=your-revalidation-secret-key
+QSTASH_TOKEN=your-qstash-token
+QSTASH_CURRENT_SIGNING_KEY=your-qstash-signing-key
+QSTASH_NEXT_SIGNING_KEY=your-qstash-next-signing-key
+
+# Site Configuration
+NEXT_PUBLIC_SITE_URL=https://your-frontend-domain.com
+NEXT_PUBLIC_CHECKOUT_URL=https://your-wordpress-site.com/checkout
+
+# Feature Flags
+LAUNCHING_SOON=false
+FORCE_DYNAMIC_DATA=false
+DATA_CACHE_MAX_AGE=28800
+ALLOW_CONCURRENT_REVALIDATION=true 

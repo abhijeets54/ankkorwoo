@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 248 248 245;
+    --foreground: 44 44 39;
+    
+    --card: 244 243 240;
+    --card-foreground: 44 44 39;
+    
+    --popover: 248 248 245;
+    --popover-foreground: 44 44 39;
+    
+    --primary: 44 44 39;
+    --primary-foreground: 244 243 240;
+    
+    --secondary: 229 226 217;
+    --secondary-foreground: 44 44 39;
+    
+    --muted: 229 226 217;
+    --muted-foreground: 92 92 82;
+    
+    --accent: 138 135 120;
+    --accent-foreground: 244 243 240;
+    
+    --destructive: 220 38 38;
+    --destructive-foreground: 248 248 245;
+    
+    --border: 229 226 217;
+    --input: 229 226 217;
+    --ring: 138 135 120;
+    
+    --radius: 0px;
+  }
+}
+
+@layer base {
+  * {
+    border-color: #e5e2d9;
+  }
+  
+  body {
+    background-color: #f8f8f5;
+    color: #2c2c27;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-playfair);
+  }
+}
+
+/* Custom Font Classes */
+.font-serif {
+  font-family: var(--font-playfair) !important;
+}
+
+.font-sans {
+  font-family: var(--font-inter) !important;
+}
+
+/* Custom Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+/* Custom Utility Classes */
+@layer components {
+  .container {
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Custom Button Styles */
+  .btn-primary {
+    background-color: #2c2c27;
+    color: #f4f3f0;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 500;
+    transition-property: color, background-color, border-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  .btn-primary:hover {
+    background-color: #3d3d35;
+  }
+  
+  .btn-secondary {
+    border: 1px solid #2c2c27;
+    color: #2c2c27;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 500;
+    transition-property: color, background-color, border-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  .btn-secondary:hover {
+    background-color: #f4f3f0;
+  }
+  
+  .btn-accent {
+    background-color: #8a8778;
+    color: #f4f3f0;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 500;
+    transition-property: color, background-color, border-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  .btn-accent:hover {
+    background-color: #5c5c52;
+  }
+  
+  /* Custom Input Styles */
+  .input-primary {
+    border-color: #e5e2d9;
+    background-color: transparent;
+    color: #2c2c27;
+  }
+  
+  .input-primary::placeholder {
+    color: #8a8778;
+  }
+  
+  .input-primary:focus {
+    border-color: #8a8778;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(138, 135, 120, 0.2);
+  }
+}
+
+/* Grayscale Image Hover Effect - Replaced with Subtle Animation */
+.image-animate {
+  transition: transform 0.7s ease-in-out, filter 0.7s ease-in-out;
+}
+
+.image-animate:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
