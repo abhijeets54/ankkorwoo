@@ -5,6 +5,9 @@ import { jwtDecode } from 'jwt-decode';
 import { GraphQLClient, gql } from 'graphql-request';
 import AccountDashboard from '@/components/account/AccountDashboard';
 
+// Force dynamic rendering for this page
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'My Account | Ankkor',
   description: 'View your account details, order history, and manage your profile.',

@@ -2199,7 +2199,7 @@ export async function getCategoryProducts(
 ) {
   try {
     const { first = 20 } = options;
-    
+
     const data = await graphQLClient.request<{ productCategory: any }>(
       QUERY_CATEGORY_PRODUCTS,
       { slug, first }
@@ -2210,6 +2210,52 @@ export async function getCategoryProducts(
     console.error(`Error fetching category products with slug ${slug}:`, error);
     return null;
   }
+}
+
+/**
+ * Get products by category - alias for getCategoryProducts for compatibility
+ */
+export async function getProductsByCategory(
+  categorySlug: string,
+  options: {
+    limit?: number;
+    page?: number;
+    sort?: string;
+  } = {}
+) {
+  const { limit = 20, page = 1, sort = 'DATE' } = options;
+  const after = page > 1 ? btoa(`arrayconnection:${(page - 1) * limit - 1}`) : undefined;
+
+  return getCategoryProducts(categorySlug, {
+    first: limit,
+    after,
+    orderby: sort,
+    order: 'DESC'
+  });
+}
+
+/**
+ * Get products by tag
+ */
+export async function getProductsByTag(
+  tagSlug: string,
+  options: {
+    limit?: number;
+    page?: number;
+    sort?: string;
+  } = {}
+) {
+  const { limit = 20, page = 1, sort = 'DATE' } = options;
+
+  // For now, return empty result as tag functionality needs proper GraphQL query
+  // This prevents build errors while maintaining API compatibility
+  console.warn(`getProductsByTag called with tag: ${tagSlug} - functionality not yet implemented`);
+
+  return {
+    tag: { id: '', name: tagSlug, slug: tagSlug, description: '' },
+    products: [],
+    pageInfo: { hasNextPage: false, endCursor: null }
+  };
 }
 
 // Customer Mutations

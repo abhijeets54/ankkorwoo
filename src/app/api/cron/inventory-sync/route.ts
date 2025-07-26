@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidateInventory, revalidateAllPages } from '@/lib/revalidationHelper';
 import { getAllProducts } from '@/lib/woocommerce';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 /**
  * API route for periodic inventory reconciliation
  * This endpoint can be called by a cron job service like Vercel Cron, 

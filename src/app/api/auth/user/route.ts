@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { GraphQLClient } from 'graphql-request';
 import { jwtDecode } from 'jwt-decode';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 // JWT token interface
 interface JwtPayload {
   exp: number;

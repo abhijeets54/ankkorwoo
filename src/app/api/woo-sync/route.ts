@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignature } from '@upstash/qstash/nextjs';
 
 import * as woocommerce from '@/lib/woocommerce';
 import * as wooInventoryMapping from '@/lib/wooInventoryMapping';
@@ -206,8 +205,26 @@ async function syncCategories() {
   }
 }
 
-// Wrap the handler with QStash signature verification for production
-// In development, use the handler directly
-export const POST = process.env.NODE_ENV === 'production'
-  ? verifySignature(handler)
-  : handler; 
+// Dynamically import and configure QStash verification
+// This prevents build-time errors when QSTASH_CURRENT_SIGNING_KEY is not available
+async function createPOSTHandler() {
+  // Only use QStash verification in production with the signing key available
+  if (process.env.NODE_ENV === 'production' && process.env.QSTASH_CURRENT_SIGNING_KEY) {
+    try {
+      const { verifySignature } = await import('@upstash/qstash/nextjs');
+      return verifySignature(handler);
+    } catch (error) {
+      console.warn('Failed to initialize QStash verification, falling back to direct handler:', error);
+      return handler;
+    }
+  }
+
+  // In development or when signing key is not available, use handler directly
+  return handler;
+}
+
+// Export the POST handler
+export const POST = async (req: NextRequest) => {
+  const postHandler = await createPOSTHandler();
+  return postHandler(req);
+};

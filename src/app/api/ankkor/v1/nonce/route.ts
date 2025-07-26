@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 /**
  * Custom API route to fetch a valid WooCommerce Store API nonce
  * This endpoint tries multiple approaches to get a valid nonce
