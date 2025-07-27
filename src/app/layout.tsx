@@ -6,20 +6,20 @@ import CartProvider from "@/components/cart/CartProvider";
 import LoadingProvider from "@/components/providers/LoadingProvider";
 import { CustomerProvider } from "@/components/providers/CustomerProvider";
 import { ToastProvider } from "@/components/ui/toast";
-// import Navbar from "@/components/layout/Navbar";
-// import Footer from "@/components/layout/Footer";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import LaunchingSoonProvider from "@/components/providers/LaunchingSoonProvider";
-// import NavbarWrapper from "@/components/layout/NavbarWrapper";
-// import FooterWrapper from "@/components/layout/FooterWrapper";
+import NavbarWrapper from "@/components/layout/NavbarWrapper";
+import FooterWrapper from "@/components/layout/FooterWrapper";
 
 // Dynamic imports with error handling
 const LaunchingStateServer = dynamic(
-  () => import('@/components/LaunchingStateServer'),
+  () => import('@/components/LaunchingStateServer').then(mod => ({ default: mod.default })),
   { ssr: true, loading: () => null }
 );
 
 const LaunchUtilsInitializer = dynamic(
-  () => import('@/components/utils/LaunchUtilsInitializer'),
+  () => import('@/components/utils/LaunchUtilsInitializer').then(mod => ({ default: mod.default })),
   { ssr: false, loading: () => null }
 );
 
@@ -68,11 +68,11 @@ export default function RootLayout({
                 <LaunchingSoonProvider>
                   <LaunchingStateServer />
                   <LaunchUtilsInitializer />
-                  {/* <NavbarWrapper /> */}
+                  <NavbarWrapper />
                   <main style={{ paddingTop: 0 }} className="transition-all duration-300">
                     {children}
                   </main>
-                  {/* <FooterWrapper /> */}
+                <FooterWrapper /> 
                 </LaunchingSoonProvider>
               </LoadingProvider>
             </CartProvider>
