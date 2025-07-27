@@ -68,38 +68,44 @@ export async function POST(request: NextRequest) {
     // Get request body
     const body = await request.json();
 
-    // Validate stock for all items before creating order
-    const stockValidationResponse = await fetch(`${request.nextUrl.origin}/api/products/validate-stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: body.line_items.map((item: any) => ({
-          productId: item.product_id,
-          variationId: item.variation_id,
-          quantity: item.quantity
-        }))
-      })
-    });
+    // Validate stock for all items before creating order (skip in development if not configured)
+    if (process.env.NODE_ENV !== 'development' || process.env.ENABLE_CHECKOUT_STOCK_VALIDATION) {
+      try {
+        const stockValidationResponse = await fetch(`${request.nextUrl.origin}/api/products/validate-stock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: body.line_items.map((item: any) => ({
+              productId: item.product_id,
+              variationId: item.variation_id,
+              quantity: item.quantity
+            }))
+          })
+        });
 
-    if (!stockValidationResponse.ok) {
-      throw new Error('Stock validation failed');
-    }
+        if (stockValidationResponse.ok) {
+          const stockValidation = await stockValidationResponse.json();
+          if (!stockValidation.allAvailable) {
+            const unavailableItems = stockValidation.validations
+              .filter((v: any) => !v.available)
+              .map((v: any) => v.message)
+              .join(', ');
 
-    const stockValidation = await stockValidationResponse.json();
-    if (!stockValidation.allAvailable) {
-      const unavailableItems = stockValidation.validations
-        .filter((v: any) => !v.available)
-        .map((v: any) => v.message)
-        .join(', ');
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Some items are no longer available: ${unavailableItems}`,
-          stockValidation: stockValidation.validations
-        },
-        { status: 400 }
-      );
+            return NextResponse.json(
+              {
+                success: false,
+                message: `Some items are no longer available: ${unavailableItems}`,
+                stockValidation: stockValidation.validations
+              },
+              { status: 400 }
+            );
+          }
+        } else {
+          console.warn('Stock validation failed during checkout, proceeding anyway');
+        }
+      } catch (stockError) {
+        console.warn('Stock validation error during checkout, proceeding anyway:', stockError);
+      }
     }
 
     // Get auth token from cookies

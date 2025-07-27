@@ -12,14 +12,14 @@ import LaunchingSoonProvider from "@/components/providers/LaunchingSoonProvider"
 import NavbarWrapper from "@/components/layout/NavbarWrapper";
 import FooterWrapper from "@/components/layout/FooterWrapper";
 
-// Dynamic imports with error handling
+// Dynamic imports with proper error handling
 const LaunchingStateServer = dynamic(
-  () => import('@/components/LaunchingStateServer').then(mod => ({ default: mod.default })),
+  () => import('@/components/LaunchingStateServer'),
   { ssr: true, loading: () => null }
 );
 
 const LaunchUtilsInitializer = dynamic(
-  () => import('@/components/utils/LaunchUtilsInitializer').then(mod => ({ default: mod.default })),
+  () => import('@/components/utils/LaunchUtilsInitializer'),
   { ssr: false, loading: () => null }
 );
 

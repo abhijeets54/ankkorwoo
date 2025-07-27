@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GraphQLClient, gql } from 'graphql-request';
 import { Redis } from '@upstash/redis';
 
-// Initialize Redis
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+// Initialize Redis with fallback handling
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
 
 // Initialize GraphQL client
 const endpoint = process.env.WOOCOMMERCE_GRAPHQL_URL || '';
@@ -186,9 +188,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Cache the validation results briefly
-    const cacheKey = `stock_validation:${Date.now()}`;
-    await redis.set(cacheKey, validations, 30); // 30 seconds TTL
+    // Cache the validation results briefly (only if Redis is available)
+    if (redis) {
+      try {
+        const cacheKey = `stock_validation:${Date.now()}`;
+        await redis.set(cacheKey, validations, 30); // 30 seconds TTL
+      } catch (cacheError) {
+        console.warn('Cache write failed, continuing without cache:', cacheError);
+      }
+    }
 
     const allAvailable = validations.every(v => v.available);
     const unavailableCount = validations.filter(v => !v.available).length;

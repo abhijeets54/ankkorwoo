@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, ReactNode, useState } from 'react';
 import { useLocalCartStore } from '@/lib/localCartStore';
-// import Cart from './Cart';
+import Cart from './Cart';
 
 // Extended interface for cart context including UI state
 interface CartContextType {
@@ -50,8 +50,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   return (
     <CartContext.Provider value={value}>
       {children}
-      {/* Temporarily disabled cart component to debug build error */}
-      {/* <Cart isOpen={value.isOpen} toggleCart={value.toggleCart} /> */}
+      <Cart isOpen={value.isOpen} toggleCart={value.toggleCart} />
     </CartContext.Provider>
   );
 };

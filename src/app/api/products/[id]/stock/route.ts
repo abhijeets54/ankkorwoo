@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GraphQLClient, gql } from 'graphql-request';
 import { Redis } from '@upstash/redis';
 
-// Initialize Redis
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+// Initialize Redis with fallback handling
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
 
 // Initialize GraphQL client
 const endpoint = process.env.WOOCOMMERCE_GRAPHQL_URL || '';
@@ -64,15 +66,22 @@ export async function GET(
     const variationId = searchParams.get('variation_id');
     const productId = params.id;
 
-    // Check cache first for faster response
-    const cacheKey = variationId 
-      ? `stock:variation:${variationId}` 
-      : `stock:product:${productId}`;
-    
-    const cachedStock = await redis.get(cacheKey);
-    if (cachedStock) {
-      console.log('Returning cached stock data for:', cacheKey);
-      return NextResponse.json(cachedStock);
+    // Check cache first for faster response (only if Redis is available)
+    let cachedStock = null;
+    if (redis) {
+      try {
+        const cacheKey = variationId
+          ? `stock:variation:${variationId}`
+          : `stock:product:${productId}`;
+
+        cachedStock = await redis.get(cacheKey);
+        if (cachedStock) {
+          console.log('Returning cached stock data for:', cacheKey);
+          return NextResponse.json(cachedStock);
+        }
+      } catch (cacheError) {
+        console.warn('Cache read failed, continuing without cache:', cacheError);
+      }
     }
 
     let stockData;
@@ -132,7 +141,16 @@ export async function GET(
     }
 
     // Cache the result for 30 seconds (short TTL for real-time accuracy)
-    await redis.set(cacheKey, stockData, 30);
+    if (redis) {
+      try {
+        const cacheKey = variationId
+          ? `stock:variation:${variationId}`
+          : `stock:product:${productId}`;
+        await redis.set(cacheKey, stockData, 30);
+      } catch (cacheError) {
+        console.warn('Cache write failed, continuing without cache:', cacheError);
+      }
+    }
 
     return NextResponse.json(stockData);
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, Suspense } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import PageLoading from '@/components/ui/PageLoading';
 
 interface LoadingContextType {
@@ -37,33 +37,30 @@ const pathVariantMap: Record<string, 'thread' | 'fabric' | 'button'> = {
 };
 
 // Separate component that uses useSearchParams
-const RouteChangeHandler = ({ setIsLoading, setVariant }: { 
+const RouteChangeHandler = ({ setIsLoading, setVariant }: {
   setIsLoading: (loading: boolean) => void;
   setVariant: (variant: 'thread' | 'fabric' | 'button') => void;
 }) => {
   const pathname = usePathname();
-  
-  // Import useSearchParams inside the component that's wrapped with Suspense
-  const { useSearchParams } = require('next/navigation');
   const searchParams = useSearchParams();
 
   // Set loading state and variant when route changes
   useEffect(() => {
     // Start loading
     setIsLoading(true);
-    
+
     // Determine the appropriate variant based on the path
     const basePathname = '/' + pathname.split('/')[1];
-    const newVariant = pathVariantMap[basePathname] || 
-                       pathVariantMap[pathname] || 
+    const newVariant = pathVariantMap[basePathname] ||
+                       pathVariantMap[pathname] ||
                        'thread';
     setVariant(newVariant);
-    
+
     // Simulate loading delay (remove in production and rely on actual loading time)
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 1200);
-    
+
     return () => clearTimeout(timer);
   }, [pathname, searchParams, setIsLoading, setVariant]);
 
