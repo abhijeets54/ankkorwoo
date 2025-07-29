@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 
 interface LoaderProps {
@@ -24,39 +26,8 @@ const Loader = ({ size = 'md', color = '#2c2c27', className = '' }: LoaderProps)
   };
 
   return (
-    <div className={`flex items-center justify-center ${className}`}>
-      <div className={`relative ${sizeMap[size].container}`}>
-        {/* Dots */}
-        <div
-          className={`absolute top-0 left-1/2 -translate-x-1/2 ${sizeMap[size].dot} rounded-full`}
-          style={{ backgroundColor: color, animation: 'loaderDot1 1.5s infinite' }}
-        ></div>
-        <div
-          className={`absolute top-1/2 right-0 -translate-y-1/2 ${sizeMap[size].dot} rounded-full`}
-          style={{ backgroundColor: color, animation: 'loaderDot2 1.5s infinite' }}
-        ></div>
-        <div
-          className={`absolute bottom-0 left-1/2 -translate-x-1/2 ${sizeMap[size].dot} rounded-full`}
-          style={{ backgroundColor: color, animation: 'loaderDot3 1.5s infinite' }}
-        ></div>
-        <div
-          className={`absolute top-1/2 left-0 -translate-y-1/2 ${sizeMap[size].dot} rounded-full`}
-          style={{ backgroundColor: color, animation: 'loaderDot4 1.5s infinite' }}
-        ></div>
-        
-        {/* Rotating circle */}
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            border: `2px solid ${color}`,
-            borderTopColor: 'transparent',
-            animation: 'loaderRotate 1s linear infinite',
-          }}
-        ></div>
-      </div>
-
-      {/* Animation keyframes */}
-      <style jsx>{`
+    <>
+      <style>{`
         @keyframes loaderRotate {
           0% {
             transform: rotate(0deg);
@@ -102,8 +73,39 @@ const Loader = ({ size = 'md', color = '#2c2c27', className = '' }: LoaderProps)
           }
         }
       `}</style>
-    </div>
+      <div className={`flex items-center justify-center ${className}`}>
+        <div className={`relative ${sizeMap[size].container}`}>
+          {/* Dots */}
+          <div
+            className={`absolute top-0 left-1/2 -translate-x-1/2 ${sizeMap[size].dot} rounded-full`}
+            style={{ backgroundColor: color, animation: 'loaderDot1 1.5s infinite' }}
+          ></div>
+          <div
+            className={`absolute top-1/2 right-0 -translate-y-1/2 ${sizeMap[size].dot} rounded-full`}
+            style={{ backgroundColor: color, animation: 'loaderDot2 1.5s infinite' }}
+          ></div>
+          <div
+            className={`absolute bottom-0 left-1/2 -translate-x-1/2 ${sizeMap[size].dot} rounded-full`}
+            style={{ backgroundColor: color, animation: 'loaderDot3 1.5s infinite' }}
+          ></div>
+          <div
+            className={`absolute top-1/2 left-0 -translate-y-1/2 ${sizeMap[size].dot} rounded-full`}
+            style={{ backgroundColor: color, animation: 'loaderDot4 1.5s infinite' }}
+          ></div>
+          
+          {/* Rotating circle */}
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              border: `2px solid ${color}`,
+              borderTopColor: 'transparent',
+              animation: 'loaderRotate 1s linear infinite',
+            }}
+          ></div>
+        </div>
+      </div>
+    </>
   );
 };
 
-export default Loader; 
+export default Loader;

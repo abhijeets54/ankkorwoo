@@ -1,27 +1,15 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
-import dynamic from 'next/dynamic';
 import CartProvider from "@/components/cart/CartProvider";
 import LoadingProvider from "@/components/providers/LoadingProvider";
 import { CustomerProvider } from "@/components/providers/CustomerProvider";
 import { ToastProvider } from "@/components/ui/toast";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 import LaunchingSoonProvider from "@/components/providers/LaunchingSoonProvider";
 import NavbarWrapper from "@/components/layout/NavbarWrapper";
 import FooterWrapper from "@/components/layout/FooterWrapper";
-
-// Dynamic imports with proper error handling
-const LaunchingStateServer = dynamic(
-  () => import('@/components/LaunchingStateServer'),
-  { ssr: true, loading: () => null }
-);
-
-const LaunchUtilsInitializer = dynamic(
-  () => import('@/components/utils/LaunchUtilsInitializer'),
-  { ssr: false, loading: () => null }
-);
+import LaunchingStateServer from "@/components/LaunchingStateServer";
+import LaunchUtilsInitializer from "@/components/utils/LaunchUtilsInitializer";
 
 // Serif font for headings
 const playfair = Playfair_Display({
