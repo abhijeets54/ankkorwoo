@@ -27,6 +27,8 @@ export interface CartItem {
     name: string;
     value: string;
   }>;
+  reservationId?: string; // Track stock reservation
+  reservedUntil?: string; // When reservation expires
 }
 
 export interface LocalCart {
@@ -145,6 +147,37 @@ export const useLocalCartStore = create<LocalCartStore>()(
             throw new Error(stockValidation.message || 'Product is out of stock');
           }
 
+          // Create stock reservation for this item
+          let reservationId: string | undefined;
+          let reservedUntil: string | undefined;
+
+          try {
+            const reservationResponse = await fetch('/api/reservations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'create',
+                productId: item.productId,
+                quantity: item.quantity,
+                userId: `cart_user_${Date.now()}`, // Generate unique user ID for cart
+                variationId: item.variationId
+              })
+            });
+
+            const reservationData = await reservationResponse.json();
+            if (reservationData.success && reservationData.reservation) {
+              reservationId = reservationData.reservation.id;
+              reservedUntil = reservationData.reservation.expiresAt;
+              console.log(`Stock reserved for ${item.name}: ${reservationId} (expires: ${reservedUntil})`);
+            } else {
+              console.warn('Failed to create stock reservation:', reservationData.error);
+              // Continue without reservation - fallback to regular stock validation
+            }
+          } catch (reservationError) {
+            console.warn('Stock reservation failed, continuing without reservation:', reservationError);
+            // Continue without reservation - fallback to regular stock validation
+          }
+
           const items = get().items;
 
           // Normalize price format - remove currency symbols and commas
@@ -170,9 +203,15 @@ export const useLocalCartStore = create<LocalCartStore>()(
           );
 
           if (existingItemIndex !== -1) {
-            // If item exists, update quantity
+            // If item exists, update quantity and reservation
             const updatedItems = [...items];
             updatedItems[existingItemIndex].quantity += normalizedItem.quantity;
+
+            // Update reservation info if we have it
+            if (reservationId) {
+              updatedItems[existingItemIndex].reservationId = reservationId;
+              updatedItems[existingItemIndex].reservedUntil = reservedUntil;
+            }
 
             set({
               items: updatedItems,
@@ -180,10 +219,12 @@ export const useLocalCartStore = create<LocalCartStore>()(
               isLoading: false,
             });
           } else {
-            // If item doesn't exist, add it with a new ID
+            // If item doesn't exist, add it with a new ID and reservation info
             const newItem = {
               ...normalizedItem,
               id: generateItemId(),
+              reservationId,
+              reservedUntil,
             };
 
             set({
