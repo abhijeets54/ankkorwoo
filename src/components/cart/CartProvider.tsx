@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, ReactNode, useState } from 'react';
 import { useLocalCartStore } from '@/lib/localCartStore';
-import Cart from './Cart';
 
 // Extended interface for cart context including UI state
 interface CartContextType {
@@ -50,7 +49,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   return (
     <CartContext.Provider value={value}>
       {children}
-      <Cart isOpen={value.isOpen} toggleCart={value.toggleCart} />
     </CartContext.Provider>
   );
 };

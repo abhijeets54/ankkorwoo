@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { createContext, useContext } from 'react';
+import { useEventListener } from '@/lib/eventBus';
 
 // Toast types
 export type ToastType = 'success' | 'error' | 'info';
@@ -38,6 +39,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
+
+  // Listen to notification events from the event bus
+  useEventListener('notification:show', ({ message, type, duration }) => {
+    addToast(message, type, duration);
+  });
+
+  useEventListener('notification:hide', ({ id }) => {
+    removeToast(id);
+  });
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>

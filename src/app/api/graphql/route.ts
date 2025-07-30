@@ -10,7 +10,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // WordPress/WooCommerce GraphQL endpoint from env variables
-    const graphqlEndpoint = process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://lightpink-eagle-376738.hostingersite.com/graphql';
+    const graphqlEndpoint = process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://maroon-lapwing-781450.hostingersite.com/graphql';
+
+    console.log('🔗 GraphQL Proxy - Using endpoint:', graphqlEndpoint);
+    console.log('📊 GraphQL Proxy - Request body:', JSON.stringify(body, null, 2));
 
     // Get the origin for CORS
     const origin = request.headers.get('origin') || '';
@@ -43,6 +46,9 @@ export async function POST(request: NextRequest) {
 
     // Get the response data
     const data = await response.json();
+
+    console.log('📊 GraphQL Proxy - Response status:', response.status);
+    console.log('📊 GraphQL Proxy - Response data:', JSON.stringify(data, null, 2));
 
     // Prepare response headers - use actual origin instead of wildcard for credentials support
     const responseHeaders: Record<string, string> = {

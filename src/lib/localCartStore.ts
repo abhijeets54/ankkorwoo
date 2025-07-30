@@ -454,6 +454,7 @@ export const useLocalCartStore = create<LocalCartStore>()(
     {
       name: 'ankkor-local-cart',
       version: STORAGE_VERSION,
+      skipHydration: true, // Prevent SSR hydration mismatches
     }
   )
 );

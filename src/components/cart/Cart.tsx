@@ -14,22 +14,20 @@ import Loader from '@/components/ui/loader';
 // Import removed as it's not being used
 import { DEFAULT_CURRENCY_SYMBOL } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/toast';
 import AnimatedCheckoutButton from '@/components/cart/AnimatedCheckoutButton';
-import { useCustomer } from '@/components/providers/CustomerProvider';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/components/cart/CartProvider';
+import { cartEvents, notificationEvents } from '@/lib/eventBus';
 
 // Extended cart item with handle for navigation
 interface ExtendedCartItem extends CartItem {
   productHandle?: string;
 }
 
-// Cart component props
-interface CartProps {
-  isOpen: boolean;
-  toggleCart: () => void;
-}
-
-const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
+// Cart component - now uses useCart hook instead of props
+const Cart: React.FC = () => {
+  // Get cart UI state from context
+  const { isOpen, toggleCart } = useCart();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [quantityUpdateInProgress, setQuantityUpdateInProgress] = useState(false);
@@ -38,7 +36,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
   const router = useRouter();
 
   // Get authentication state
-  const { isAuthenticated, customer, token } = useCustomer();
+  const { isAuthenticated, user, token } = useAuth();
 
   // Get cart data from the store
   const cart = useLocalCartStore();
@@ -52,7 +50,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
     setError
   } = cart;
 
-  const toast = useToast();
+  // Toast functionality now handled via events
   
   // Function to safely format price
   const safeFormatPrice = (price: string | number): string => {
@@ -169,12 +167,15 @@ const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
   // Handle quantity updates
   const handleQuantityUpdate = async (id: string, newQuantity: number) => {
     setQuantityUpdateInProgress(true);
-    
+
     try {
       await updateItem(id, newQuantity);
+      cartEvents.itemUpdated(id, newQuantity, 'Item quantity updated');
     } catch (error) {
       console.error('Error updating quantity:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update quantity');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update quantity';
+      setError(errorMessage);
+      notificationEvents.show(errorMessage, 'error');
     } finally {
       setQuantityUpdateInProgress(false);
     }
@@ -184,12 +185,27 @@ const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
   const handleRemoveItem = async (id: string) => {
     try {
       await removeItem(id);
+      cartEvents.itemRemoved(id, 'Item removed from cart');
     } catch (error) {
       console.error('Error removing item:', error);
-      setError(error instanceof Error ? error.message : 'Failed to remove item');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove item';
+      setError(errorMessage);
+      notificationEvents.show(errorMessage, 'error');
     }
   };
-  
+
+  // Handle clear cart
+  const handleClearCart = async () => {
+    try {
+      await clearCart();
+      cartEvents.cleared('Cart cleared');
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to clear cart';
+      notificationEvents.show(errorMessage, 'error');
+    }
+  };
+
   // Handle checkout process
   const handleCheckout = async () => {
     setCheckoutLoading(true);
@@ -216,8 +232,8 @@ const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
       console.error('Checkout error:', error);
       setCheckoutError(error instanceof Error ? error.message : 'An error occurred during checkout');
 
-      // Display a toast message
-      toast.addToast(
+      // Display a toast message via events
+      notificationEvents.show(
         error instanceof Error ? error.message : 'An error occurred during checkout',
         'error'
       );
@@ -409,7 +425,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, toggleCart }) => {
 
             {/* Clear Cart Button */}
             <button
-              onClick={clearCart}
+              onClick={handleClearCart}
               className="w-full text-center text-gray-500 text-sm mt-2 hover:text-gray-700"
               disabled={checkoutLoading || quantityUpdateInProgress}
             >

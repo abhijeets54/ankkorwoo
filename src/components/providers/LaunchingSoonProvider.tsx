@@ -14,22 +14,17 @@ interface LaunchingSoonState {
 export const useLaunchingSoonStore = create<LaunchingSoonState>()(
   persist(
     (set) => ({
-      // In production, use the NEXT_PUBLIC_LAUNCHING_SOON env var; in development, default to true
-      isLaunchingSoon: process.env.NODE_ENV === 'production'
-        ? process.env.NEXT_PUBLIC_LAUNCHING_SOON === 'true'
-        : true,
+      // Default to false to prevent hydration mismatches
+      // The actual value will be set by LaunchingStateInitializer on the client
+      isLaunchingSoon: false,
       setIsLaunchingSoon: (isLaunchingSoon) => {
-        // In production, only allow changes if explicitly configured
-        if (process.env.NODE_ENV === 'production') {
-          console.warn('Changing launch state is disabled in production.');
-          return;
-        }
         set({ isLaunchingSoon });
       },
     }),
     {
       name: 'ankkor-launch-state', // Storage key
-      // Add proper SSR handling
+      // Add proper SSR handling with skipHydration
+      skipHydration: true,
       storage: {
         getItem: (name) => {
           if (typeof window === 'undefined') return null;
@@ -81,28 +76,17 @@ export const LaunchingSoonProvider: React.FC<{ children: React.ReactNode }> = ({
   // Use the Zustand store to provide the context
   const store = useLaunchingSoonStore();
 
-  // We need to handle hydration mismatches in Next.js
+  // Handle hydration by rehydrating the store on client-side
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    // Rehydrate the store from localStorage
+    useLaunchingSoonStore.persist.rehydrate();
     setIsHydrated(true);
-
-    // In production, ensure the state matches the environment variable
-    if (process.env.NODE_ENV === 'production') {
-      // This ensures that if the env var changes on a new deploy,
-      // the state will be updated even if localStorage has a different value
-      const envValue = process.env.NEXT_PUBLIC_LAUNCHING_SOON === 'true';
-      if (store.isLaunchingSoon !== envValue) {
-        // Force the state to match the environment variable
-        // This is a hacky way to update the state in production
-        // because the setIsLaunchingSoon method is blocked in production
-        useLaunchingSoonStore.setState({ isLaunchingSoon: envValue });
-      }
-    }
-  }, [store]);
+  }, []);
 
   // Always render children to prevent hydration mismatches
-  // The individual components will handle their own hydration state
+  // The LaunchingStateInitializer will handle setting the correct value
   return (
     <LaunchingSoonContext.Provider value={store}>
       {children}

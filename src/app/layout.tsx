@@ -4,12 +4,15 @@ import "./globals.css";
 import CartProvider from "@/components/cart/CartProvider";
 import LoadingProvider from "@/components/providers/LoadingProvider";
 import { CustomerProvider } from "@/components/providers/CustomerProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/components/ui/toast";
 import LaunchingSoonProvider from "@/components/providers/LaunchingSoonProvider";
-import NavbarWrapper from "@/components/layout/NavbarWrapper";
-import FooterWrapper from "@/components/layout/FooterWrapper";
-import LaunchingStateServer from "@/components/LaunchingStateServer";
+import LaunchingStateInitializer from "@/components/LaunchingStateInitializer";
 import LaunchUtilsInitializer from "@/components/utils/LaunchUtilsInitializer";
+import StoreHydrationInitializer from "@/components/StoreHydrationInitializer";
+import CartWrapper from "@/components/cart/CartWrapper";
+import NavbarWrapperSSR from "@/components/layout/NavbarWrapperSSR";
+import FooterWrapperSSR from "@/components/layout/FooterWrapperSSR";
 
 // Serif font for headings
 const playfair = Playfair_Display({
@@ -50,21 +53,27 @@ export default function RootLayout({
         className={`${playfair.variable} ${inter.variable} font-sans antialiased min-h-screen bg-[#f8f8f5]`}
       >
         <ToastProvider>
-          <CustomerProvider>
-            <CartProvider>
-              <LoadingProvider>
-                <LaunchingSoonProvider>
-                  <LaunchingStateServer />
+          <AuthProvider>
+            <CustomerProvider>
+              <CartProvider>
+                <LoadingProvider>
+                  <LaunchingSoonProvider>
+                  <LaunchingStateInitializer />
                   <LaunchUtilsInitializer />
-                  <NavbarWrapper />
+                  <StoreHydrationInitializer />
+                  {/* NavbarWrapper and FooterWrapper - now SSR-safe with dynamic imports */}
+                  <NavbarWrapperSSR />
                   <main style={{ paddingTop: 0 }} className="transition-all duration-300">
                     {children}
                   </main>
-                <FooterWrapper /> 
-                </LaunchingSoonProvider>
-              </LoadingProvider>
-            </CartProvider>
-          </CustomerProvider>
+                  <FooterWrapperSSR />
+                  </LaunchingSoonProvider>
+                </LoadingProvider>
+                {/* Cart component - now SSR-safe with skipHydration and proper rehydration */}
+                <CartWrapper />
+              </CartProvider>
+            </CustomerProvider>
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useCustomer } from '@/components/providers/CustomerProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCartStore, useWishlistStore, WishlistItem } from '@/lib/store';
+import { useEventListener, cartEvents } from '@/lib/eventBus';
 
 // Helper functions for wishlist sync
 const fetchUserWishlist = async (): Promise<WishlistItem[]> => {
@@ -54,15 +55,28 @@ const mergeWishlists = (local: WishlistItem[], saved: WishlistItem[]): WishlistI
  * wishlist synchronization between guest and authenticated states.
  */
 export function useAuthCartSync() {
-  const { isAuthenticated, customer } = useCustomer();
+  const { isAuthenticated, user } = useAuth();
   const cartStore = useCartStore();
   const wishlistStore = useWishlistStore();
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // Use refs to track previous authentication state and customer ID
+  // Use refs to track previous authentication state and user ID
   const prevAuthRef = useRef(isAuthenticated);
-  const prevCustomerIdRef = useRef(customer?.id || null);
+  const prevUserIdRef = useRef(user?.id || null);
   
+  // Listen to auth events to trigger sync
+  useEventListener('auth:login-success', () => {
+    if (!isSyncing) {
+      handleLogin();
+    }
+  });
+
+  useEventListener('auth:logout', () => {
+    if (!isSyncing) {
+      handleLogout();
+    }
+  });
+
   // Effect to handle auth state changes
   useEffect(() => {
     // Skip if already syncing to prevent loops
@@ -71,6 +85,7 @@ export function useAuthCartSync() {
     // Function to clear cart and wishlist data on logout
     const handleLogout = async () => {
       setIsSyncing(true);
+      cartEvents.syncStarted();
       console.log('Auth state changed: User logged out - resetting cart and wishlist');
       
       try {
@@ -102,6 +117,8 @@ export function useAuthCartSync() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('cartInitialized', 'true');
         }
+
+        cartEvents.syncCompleted();
       } catch (error) {
         console.error('Error handling logout:', error);
       } finally {
@@ -112,16 +129,16 @@ export function useAuthCartSync() {
     // Function to handle login and merge guest cart/wishlist with account
     const handleLogin = async () => {
       setIsSyncing(true);
+      cartEvents.syncStarted();
       console.log('Auth state changed: User logged in - syncing cart and wishlist');
-      
+
       try {
         // Cart sync happens automatically through Shopify's API when authenticated
-        
-        // Show a tooltip or notification that the cart was transferred if needed
-        // This could integrate with a toast/notification system
-        
+
         // Sync wishlist with user profile
         await syncWishlistOnLogin();
+
+        cartEvents.syncCompleted();
       } catch (error) {
         console.error('Error handling login:', error);
       } finally {
@@ -183,16 +200,16 @@ export function useAuthCartSync() {
         };
         handleLogoutSequence();
       }
-    } else if (isAuthenticated && customer?.id !== prevCustomerIdRef.current) {
+    } else if (isAuthenticated && user?.id !== prevUserIdRef.current) {
       // User switched accounts while staying logged in
       handleLogin();
     }
-    
+
     // Update the refs for the next render
     prevAuthRef.current = isAuthenticated;
-    prevCustomerIdRef.current = customer?.id || null;
-    
-  }, [isAuthenticated, customer?.id, cartStore, wishlistStore, isSyncing]);
+    prevUserIdRef.current = user?.id || null;
+
+  }, [isAuthenticated, user?.id, cartStore, wishlistStore, isSyncing]);
   
   return null;
 } 

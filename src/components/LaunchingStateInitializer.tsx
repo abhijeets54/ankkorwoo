@@ -3,26 +3,23 @@
 import { useEffect } from 'react';
 import { useLaunchingSoonStore } from './providers/LaunchingSoonProvider';
 
-interface LaunchingStateInitializerProps {
-  launchingState: boolean;
-}
-
 /**
- * This component is used to initialize the launching state from server-side props.
- * It ensures that the environment variable is properly passed to the client.
+ * SSR-safe component that initializes the launching state from environment variables.
+ * This component properly handles client-side state initialization without hydration mismatches.
  */
-export default function LaunchingStateInitializer({ launchingState }: LaunchingStateInitializerProps) {
+export default function LaunchingStateInitializer() {
   useEffect(() => {
-    // Update the store with the server-provided value
-    // This ensures the value comes from server environment variables
-    const currentState = useLaunchingSoonStore.getState().isLaunchingSoon;
-    
-    if (currentState !== launchingState) {
-      console.log('Updating launching state from server:', launchingState);
-      useLaunchingSoonStore.setState({ isLaunchingSoon: launchingState });
-    }
-  }, [launchingState]);
+    // Only run on client-side to prevent hydration mismatches
+    if (typeof window !== 'undefined') {
+      // Get the environment variable value on the client
+      const envValue = process.env.NEXT_PUBLIC_LAUNCHING_SOON === 'true';
 
-  // This component doesn't render anything
+      // Update the store with the environment variable value
+      // This ensures consistency between server and client
+      useLaunchingSoonStore.getState().setIsLaunchingSoon(envValue);
+    }
+  }, []);
+
+  // This component renders nothing - it's purely for side effects
   return null;
-} 
+}

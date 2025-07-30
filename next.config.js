@@ -77,7 +77,8 @@ const nextConfig = {
   },
   
   // Configure output settings - use 'standalone' for Vercel deployment
-  output: 'standalone',
+  // Temporarily commented out for development - causes "missing required error components" error
+  // output: 'standalone',
   
   // Expose environment variables to the browser
   env: {

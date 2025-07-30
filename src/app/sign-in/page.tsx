@@ -1,9 +1,11 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AuthForm from '@/components/auth/AuthForm';
 
-export default function SignInPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function SignInContent() {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/';
   
@@ -24,4 +26,13 @@ export default function SignInPage() {
       </div>
     </div>
   );
-} 
+}
+
+// Main page component with Suspense boundary
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto py-12 px-4"><div className="text-center">Loading...</div></div>}>
+      <SignInContent />
+    </Suspense>
+  );
+}

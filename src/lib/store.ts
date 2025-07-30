@@ -485,6 +485,7 @@ export const useWishlistStore = create<WishlistState>()(
       partialize: (state) => ({
         items: state.items
       }),
+      skipHydration: true, // Prevent SSR hydration mismatches
     }
   )
 ); 

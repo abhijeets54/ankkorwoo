@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { searchProducts } from '@/lib/woocommerce';
 import ProductCard from '@/components/product/ProductCard';
@@ -24,7 +24,8 @@ interface WooProduct {
   databaseId: number;
 }
 
-export default function SearchPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
   
@@ -103,4 +104,13 @@ export default function SearchPage() {
       )}
     </div>
   );
-} 
+}
+
+// Main page component with Suspense boundary
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto py-12 px-4"><div className="text-center">Loading...</div></div>}>
+      <SearchContent />
+    </Suspense>
+  );
+}

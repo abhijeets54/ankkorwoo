@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Filter, ChevronDown, X } from 'lucide-react';
+
 import ProductCard from '@/components/product/ProductCard';
 import Link from 'next/link';
 import ImageLoader from '@/components/ui/ImageLoader';
 import usePageLoading from '@/hooks/usePageLoading';
-import { getAllProducts, normalizeProductImages, getMetafield } from '@/lib/woocommerce';
+import { getCategoryProducts, normalizeProduct, getMetafield } from '@/lib/woocommerce';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
 
 // Define product type
@@ -30,25 +30,34 @@ interface Product {
   id: string;
   title: string;
   handle: string;
-  price: string;
-  images: ProductImage[];
-  variants: ProductVariant[];
-  metafields: Record<string, string>;
-  productType?: string;
-  tags?: string[];
-  vendor?: string;
-  material?: string;
-  compareAtPrice?: string | null;
+  description?: string;
+  descriptionHtml?: string;
+  priceRange: {
+    minVariantPrice: {
+      amount: string;
+      currencyCode: string;
+    };
+    maxVariantPrice: {
+      amount: string;
+      currencyCode: string;
+    };
+  };
+  images: Array<{url: string, altText?: string}>;
+  variants: any[];
+  options: any[];
+  collections: any[];
+  availableForSale: boolean;
+  metafields: Record<string, any>;
   currencyCode?: string;
+  compareAtPrice?: string | null;
+  _originalWooProduct?: any;
 }
 
 export default function ShirtsCollectionPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [priceRange, setPriceRange] = useState([0, 25000]);
-  const [sortOption, setSortOption] = useState('featured');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   
   // Use the page loading hook
   usePageLoading(isLoading, 'fabric');
@@ -58,142 +67,222 @@ export default function ShirtsCollectionPage() {
     const fetchProducts = async () => {
       try {
         setIsLoading(true);
-        const allProducts = await getAllProducts();
-        
-        if (!allProducts || allProducts.length === 0) {
-          setError('No products found. Please check your WooCommerce configuration.');
+        setError(null);
+
+        console.log('🔍 Starting to fetch shirts from WooCommerce...');
+
+        // First, let's test the WooCommerce connection
+        let connectionTest = null;
+        try {
+          console.log('🧪 Testing WooCommerce connection...');
+          const { testWooCommerceConnection } = await import('@/lib/woocommerce');
+          connectionTest = await testWooCommerceConnection();
+          console.log('🔗 Connection test result:', connectionTest);
+        } catch (err) {
+          console.log('❌ Failed to test connection:', err);
+        }
+
+        // Then, let's test if we can fetch all categories to see what's available
+        let allCategories = null;
+        try {
+          console.log('📋 Fetching all categories to debug...');
+          const { getAllCategories } = await import('@/lib/woocommerce');
+          allCategories = await getAllCategories(50);
+          console.log('📂 Available categories:', allCategories?.map((cat: any) => ({
+            name: cat.name,
+            slug: cat.slug,
+            id: cat.id,
+            count: cat.count
+          })));
+        } catch (err) {
+          console.log('❌ Failed to fetch categories:', err);
+        }
+
+        // Try multiple approaches to fetch shirts
+        let categoryData = null;
+        let fetchMethod = '';
+
+        // Method 1: Try with category slug 'shirts'
+        try {
+          console.log('📋 Attempting to fetch with category slug: "shirts"');
+          categoryData = await getCategoryProducts('shirts', { first: 100 });
+          fetchMethod = 'slug: shirts';
+
+          if (categoryData?.products?.nodes?.length > 0) {
+            console.log('✅ Success with method 1 (slug: shirts)');
+          } else {
+            console.log('⚠️ Method 1 returned empty or null:', categoryData);
+          }
+        } catch (err) {
+          console.log('❌ Method 1 failed:', err);
+        }
+
+        // Method 2: Try with different category variations if method 1 failed
+        if (!categoryData?.products?.nodes?.length) {
+          const alternativeNames = ['shirt', 'Shirts', 'SHIRTS', 'men-shirts', 'mens-shirts', 'clothing', 'apparel'];
+
+          for (const altName of alternativeNames) {
+            try {
+              console.log(`📋 Attempting to fetch with category: "${altName}"`);
+              categoryData = await getCategoryProducts(altName, { first: 100 });
+              fetchMethod = `slug: ${altName}`;
+
+              if (categoryData?.products?.nodes?.length > 0) {
+                console.log(`✅ Success with alternative name: ${altName}`);
+                break;
+              } else {
+                console.log(`⚠️ No products found for category: ${altName}`);
+              }
+            } catch (err) {
+              console.log(`❌ Failed with ${altName}:`, err);
+            }
+          }
+        }
+
+        // Method 3: Try to find the correct category from the list of all categories
+        if (!categoryData?.products?.nodes?.length && allCategories?.length > 0) {
+          console.log('📋 Searching for shirt-related categories in available categories...');
+          const shirtCategory = allCategories.find((cat: any) => {
+            const name = cat.name?.toLowerCase() || '';
+            const slug = cat.slug?.toLowerCase() || '';
+            return name.includes('shirt') || slug.includes('shirt') ||
+                   name.includes('clothing') || slug.includes('clothing') ||
+                   name.includes('apparel') || slug.includes('apparel');
+          });
+
+          if (shirtCategory) {
+            console.log(`📋 Found potential shirt category: ${shirtCategory.name} (${shirtCategory.slug})`);
+            try {
+              categoryData = await getCategoryProducts(shirtCategory.slug, { first: 100 });
+              fetchMethod = `found category: ${shirtCategory.slug}`;
+
+              if (categoryData?.products?.nodes?.length > 0) {
+                console.log(`✅ Success with found category: ${shirtCategory.slug}`);
+              }
+            } catch (err) {
+              console.log(`❌ Failed with found category ${shirtCategory.slug}:`, err);
+            }
+          }
+        }
+
+        // Method 4: If still no results, try fetching all products and filter by keywords
+        if (!categoryData?.products?.nodes?.length) {
+          try {
+            console.log('📋 Attempting to fetch all products and filter by keywords...');
+            const { getAllProducts } = await import('@/lib/woocommerce');
+            const allProducts = await getAllProducts(100);
+            fetchMethod = 'all products filtered by keywords';
+
+            if (allProducts?.length > 0) {
+              // Filter products that might be shirts
+              const filteredProducts = allProducts.filter((product: any) => {
+                const title = product.name?.toLowerCase() || product.title?.toLowerCase() || '';
+                const description = product.description?.toLowerCase() || product.shortDescription?.toLowerCase() || '';
+                const categories = product.productCategories?.nodes || product.categories || [];
+
+                // Check if product title or description contains shirt-related keywords
+                const shirtKeywords = ['shirt', 'formal', 'casual', 'dress', 'button', 'collar', 'sleeve'];
+                const hasShirtKeyword = shirtKeywords.some(keyword =>
+                  title.includes(keyword) || description.includes(keyword)
+                );
+
+                // Check if product belongs to shirts category
+                const hasShirtCategory = categories.some((cat: any) => {
+                  const catName = cat.name?.toLowerCase() || cat.slug?.toLowerCase() || '';
+                  return catName.includes('shirt') || catName.includes('clothing') || catName.includes('apparel');
+                });
+
+                return hasShirtKeyword || hasShirtCategory;
+              });
+
+              // Create a mock category structure
+              categoryData = {
+                products: {
+                  nodes: filteredProducts
+                }
+              };
+              console.log(`✅ Filtered ${filteredProducts.length} shirt products from all products`);
+            }
+          } catch (err) {
+            console.log('❌ Method 4 failed:', err);
+          }
+        }
+
+        // Set debug information
+        setDebugInfo({
+          fetchMethod,
+          totalProducts: categoryData?.products?.nodes?.length || 0,
+          connectionTest: connectionTest || 'No connection test performed',
+          availableCategories: allCategories?.map((cat: any) => ({ name: cat.name, slug: cat.slug, count: cat.count })) || [],
+          categoryData: categoryData ? JSON.stringify(categoryData, null, 2) : 'No data',
+          timestamp: new Date().toISOString()
+        });
+
+        console.log('📊 Debug Info:', {
+          fetchMethod,
+          totalProducts: categoryData?.products?.nodes?.length || 0,
+          hasData: !!categoryData,
+          hasProducts: !!categoryData?.products,
+          hasNodes: !!categoryData?.products?.nodes,
+          availableCategories: allCategories?.length || 0
+        });
+
+        if (!categoryData || !categoryData.products?.nodes || categoryData.products.nodes.length === 0) {
+          console.log('❌ No shirt products found in any category');
+          setError(`No shirt products found using method: ${fetchMethod}. Available categories: ${allCategories?.map((cat: any) => cat.name).join(', ') || 'None found'}. Please check your WooCommerce shirts category setup.`);
           setIsLoading(false);
           return;
         }
-        
-        // Transform products to match our interface and filter for shirts only
+
+        const allProducts = categoryData.products.nodes;
+        console.log(`📦 Found ${allProducts.length} products, normalizing...`);
+
+        // Normalize the products
         const transformedProducts = allProducts
-          .map((product: any) => {
-            // Use the utility function to safely extract images
-            const productImages = normalizeProductImages(product.images, product.title);
-            
-            // Extract material from metafields
-            let material = '';
+          .map((product: any, index: number) => {
             try {
-              // Add null check and proper error handling
-              if (product && product.metafields) {
-                const customMaterial = product.metafields.find(
-                  (metafield: any) => metafield && metafield.key === 'custom_material'
-                );
-                material = customMaterial?.value || '';
+              console.log(`🔄 Normalizing product ${index + 1}:`, product.name || product.title);
+              const normalizedProduct = normalizeProduct(product);
+
+              if (normalizedProduct) {
+                // Ensure currencyCode is included
+                (normalizedProduct as any).currencyCode = 'INR';
+                console.log(`✅ Successfully normalized: ${normalizedProduct.title}`);
+                return normalizedProduct;
+              } else {
+                console.log(`⚠️ Failed to normalize product: ${product.name || product.title}`);
+                return null;
               }
-            } catch (error) {
-              console.error(`Error extracting material for product ${product?.title}:`, error);
-              material = '';
+            } catch (err) {
+              console.error(`❌ Error normalizing product ${index + 1}:`, err);
+              return null;
             }
-            
-            // Extract variants from the product data
-            let variants: ProductVariant[] = [];
-            try {
-              // Handle GraphQL edges/node format
-              if (product.variants?.edges) {
-                variants = product.variants.edges.map((edge: any) => ({
-                  id: edge.node.id,
-                  title: edge.node.title,
-                  price: edge.node.price?.amount,
-                  compareAtPrice: edge.node.compareAtPrice?.amount,
-                }));
-              } 
-              // Handle already normalized array format
-              else if (Array.isArray(product.variants)) {
-                variants = product.variants;
-              }
-              
-              // Ensure we have at least one variant if needed
-              if (variants.length === 0 && product.id) {
-                // Create a fallback variant using the product ID
-                const productIdParts = product.id.split('/');
-                const productIdNum = productIdParts[productIdParts.length - 1];
-                variants = [{
-                  id: `gid://shopify/ProductVariant/${productIdNum}`,
-                  title: 'Default',
-                  price: product.priceRange?.minVariantPrice?.amount || '0',
-                }];
-                console.warn(`Created fallback variant for product ${product.title}`);
-              }
-            } catch (error) {
-              console.error(`Error extracting variants for product ${product?.title}:`, error);
-              variants = [];
-            }
-            
-            return {
-              id: product.id,
-              title: product.title || "Untitled Product",
-              handle: product.handle || "",
-              price: product.priceRange?.minVariantPrice?.amount || 
-                     (variants[0]?.price) || 
-                     "0.00",
-              images: productImages,
-              variants: variants,
-              metafields: product.metafields || {},
-              productType: product.productType || '',
-              tags: Array.isArray(product.tags) ? product.tags : [],
-              vendor: product.vendor || '',
-              material: material,
-              compareAtPrice: variants[0]?.compareAtPrice || null,
-              currencyCode: product.priceRange?.minVariantPrice?.currencyCode || 
-                          (variants[0]?.currencyCode) ||
-                          'INR'
-            };
           })
-          .filter((product: Product) => {
-            const productType = product.productType?.toLowerCase() || '';
-            const tags = product.tags?.map(tag => tag.toLowerCase()) || [];
-            const title = product.title.toLowerCase();
-            
-            // Filter for shirts
-            return productType.includes('shirt') || 
-                   tags.some(tag => tag.includes('shirt')) ||
-                   title.includes('shirt');
-          });
-        
+          .filter(Boolean) as Product[];
+
+        console.log(`🎉 Successfully processed ${transformedProducts.length} shirt products`);
+        console.log('📦 Setting products:', transformedProducts.map(p => ({
+          title: p.title,
+          price: p.priceRange?.minVariantPrice?.amount,
+          id: p.id
+        })));
         setProducts(transformedProducts);
-        console.log(`Successfully fetched ${transformedProducts.length} shirt products from WooCommerce`);
+
       } catch (err) {
-        console.error("Error fetching products:", err);
-        setError('Failed to load products from WooCommerce');
+        console.error("💥 Critical error fetching products:", err);
+        setError(`Failed to load products from WooCommerce: ${err instanceof Error ? err.message : 'Unknown error'}`);
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchProducts();
   }, []);
   
-  // Toggle filter drawer
-  const toggleFilter = () => {
-    setIsFilterOpen(!isFilterOpen);
-  };
+
   
-  // Filter products by price range
-  const filteredProducts = products.filter(product => {
-    // Filter by price range
-    const price = parseFloat(product.price) || 0;
-    return price >= priceRange[0] && price <= priceRange[1];
-  });
-  
-  // Sort products
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch (sortOption) {
-      case 'price-asc':
-        return parseFloat(a.price) - parseFloat(b.price);
-      case 'price-desc':
-        return parseFloat(b.price) - parseFloat(a.price);
-      case 'rating':
-        // Sort by title as an alternative since rating is removed
-        return a.title.localeCompare(b.title);
-      case 'newest':
-        // Sort by ID as a proxy for newness (higher IDs are typically newer)
-        return b.id.localeCompare(a.id);
-      default:
-        return 0;
-    }
-  });
+  // No filtering - show all products
+  const sortedProducts = products;
   
   // Animation variants
   const fadeIn = {
@@ -238,142 +327,40 @@ export default function ShirtsCollectionPage() {
         {/* Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 mb-8 rounded">
+            <p className="font-semibold">Error loading shirts:</p>
             <p>{error}</p>
-            <p className="text-sm mt-2">Please check your WooCommerce configuration in the .env.local file.</p>
+            <p className="text-sm mt-2">Please check your WooCommerce configuration and ensure you have products in the 'shirts' category.</p>
+            
+            {/* Debug information */}
+            {debugInfo && (
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm font-semibold">Debug Information</summary>
+                <pre className="text-xs mt-2 bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </details>
+            )}
+          </div>
+        )}
+
+        {/* Loading state */}
+        {isLoading && (
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2c2c27]"></div>
+            <p className="mt-4 text-[#5c5c52]">Loading shirts...</p>
           </div>
         )}
         
-        {/* Mobile Filter Button */}
-        <div className="flex justify-between items-center mb-8 md:hidden">
-          <button
-            onClick={toggleFilter}
-            className="flex items-center gap-2 text-[#2c2c27] border border-[#e5e2d9] px-4 py-2"
-          >
-            <Filter className="h-4 w-4" />
-            <span>Filter & Sort</span>
-          </button>
+        {/* Product Count */}
+        <div className="flex justify-end items-center mb-8">
           <div className="text-[#5c5c52] text-sm">
             {sortedProducts.length} products
           </div>
         </div>
-        
-        {/* Mobile Filter Drawer */}
-        {isFilterOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <div className="absolute inset-0 bg-black bg-opacity-50" onClick={toggleFilter}></div>
-            <div className="absolute right-0 top-0 bottom-0 w-80 bg-[#f8f8f5] p-6 overflow-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-serif text-lg text-[#2c2c27]">Filter & Sort</h3>
-                <button onClick={toggleFilter}>
-                  <X className="h-5 w-5 text-[#2c2c27]" />
-                </button>
-              </div>
-              
 
-              <div className="mb-8">
-                <h4 className="text-[#8a8778] text-xs uppercase tracking-wider mb-4">Price Range</h4>
-                <div className="px-2">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-[#5c5c52] text-sm">{getCurrencySymbol('INR')}{priceRange[0]}</span>
-                    <span className="text-[#5c5c52] text-sm">{getCurrencySymbol('INR')}{priceRange[1]}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="25000"
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-                    className="w-full h-2 bg-[#e5e2d9] rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="text-[#8a8778] text-xs uppercase tracking-wider mb-4">Sort By</h4>
-                <div className="space-y-3">
-                  {[
-                    { id: 'featured', name: 'Featured' },
-                    { id: 'price-asc', name: 'Price: Low to High' },
-                    { id: 'price-desc', name: 'Price: High to Low' },
-                    { id: 'rating', name: 'Alphabetical' },
-                    { id: 'newest', name: 'Newest' }
-                  ].map(option => (
-                    <button
-                      key={option.id}
-                      onClick={() => setSortOption(option.id)}
-                      className={`block w-full text-left py-1 ${
-                        sortOption === option.id
-                          ? 'text-[#2c2c27] font-medium'
-                          : 'text-[#5c5c52]'
-                      }`}
-                    >
-                      {option.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <button
-                onClick={toggleFilter}
-                className="w-full bg-[#2c2c27] text-[#f4f3f0] py-3 mt-8 text-sm uppercase tracking-wider"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        )}
         
-        <div className="flex flex-col md:flex-row gap-10">
-          {/* Desktop Sidebar */}
-          <div className="hidden md:block w-64 shrink-0">
-            <div className="sticky top-24">
-<div className="mb-10">
-                <h3 className="text-[#2c2c27] font-serif text-lg mb-6">Price Range</h3>
-                <div className="px-2">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-[#5c5c52]">{getCurrencySymbol('INR')}{priceRange[0]}</span>
-                    <span className="text-[#5c5c52]">{getCurrencySymbol('INR')}{priceRange[1]}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="25000"
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-                    className="w-full h-2 bg-[#e5e2d9] rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-[#2c2c27] font-serif text-lg mb-6">Sort By</h3>
-                <div className="space-y-3">
-                  {[
-                    { id: 'featured', name: 'Featured' },
-                    { id: 'price-asc', name: 'Price: Low to High' },
-                    { id: 'price-desc', name: 'Price: High to Low' },
-                    { id: 'rating', name: 'Alphabetical' },
-                    { id: 'newest', name: 'Newest' }
-                  ].map(option => (
-                    <button
-                      key={option.id}
-                      onClick={() => setSortOption(option.id)}
-                      className={`block w-full text-left py-1 ${
-                        sortOption === option.id
-                          ? 'text-[#2c2c27] font-medium'
-                          : 'text-[#5c5c52] hover:text-[#2c2c27] transition-colors'
-                      }`}
-                    >
-                      {option.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Products Grid */}
-          <div className="flex-1">
+        {/* Products Grid */}
+        <div>
             <div className="hidden md:flex justify-between items-center mb-8">
               <h2 className="text-[#2c2c27] font-serif text-xl">
                 Shirts Collection
@@ -383,111 +370,102 @@ export default function ShirtsCollectionPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {sortedProducts.map(product => {
-                // Extract and validate the variant ID for the product
-                let variantId = '';
-                let isValidVariant = false;
-                
-                try {
-                  // Check if variants exist and extract the first variant ID
-                  if (product.variants && product.variants.length > 0) {
-                    const variant = product.variants[0];
-                    if (variant && variant.id) {
-                      variantId = variant.id;
-                      isValidVariant = true;
-                      
-                      // Ensure the variant ID is properly formatted
-                      if (!variantId.startsWith('gid://shopify/ProductVariant/')) {
-                        // Extract numeric ID if possible and reformat
-                        const numericId = variantId.replace(/\D/g, '');
-                        if (numericId) {
+            {!isLoading && sortedProducts.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {sortedProducts.map(product => {
+                  // Extract and validate the variant ID for the product
+                  let variantId = '';
+                  let isValidVariant = false;
+                  
+                  try {
+                    // Check if variants exist and extract the first variant ID
+                    if (product.variants && product.variants.length > 0) {
+                      const variant = product.variants[0];
+                      if (variant && variant.id) {
+                        variantId = variant.id;
+                        isValidVariant = true;
+                        
+                        // Ensure the variant ID is properly formatted
+                        if (!variantId.startsWith('gid://shopify/ProductVariant/')) {
+                          // Extract numeric ID if possible and reformat
+                          const numericId = variantId.replace(/\D/g, '');
+                          if (numericId) {
+                            variantId = `gid://shopify/ProductVariant/${numericId}`;
+                          } else {
+                            console.warn(`Cannot parse variant ID for product ${product.title}: ${variantId}`);
+                            isValidVariant = false;
+                          }
+                        }
+                        
+                        console.log(`Product ${product.title} using variant ID: ${variantId}`);
+                      }
+                    }
+                    
+                    // If no valid variant ID found, try to create a fallback from product ID
+                    if (!isValidVariant && product.id) {
+                      // Only attempt fallback if product ID has a numeric component
+                      if (product.id.includes('/')) {
+                        const parts = product.id.split('/');
+                        const numericId = parts[parts.length - 1];
+                        
+                        if (numericId && /^\d+$/.test(numericId)) {
+                          // Create a fallback ID - note this might not work if variants aren't 1:1 with products
                           variantId = `gid://shopify/ProductVariant/${numericId}`;
-                        } else {
-                          console.warn(`Cannot parse variant ID for product ${product.title}: ${variantId}`);
-                          isValidVariant = false;
+                          console.warn(`Using fallback variant ID for ${product.title}: ${variantId}`);
+                          isValidVariant = true;
                         }
                       }
-                      
-                      console.log(`Product ${product.title} using variant ID: ${variantId}`);
                     }
+                  } catch (error) {
+                    console.error(`Error processing variant for product ${product.title}:`, error);
+                    isValidVariant = false;
                   }
                   
-                  // If no valid variant ID found, try to create a fallback from product ID
-                  if (!isValidVariant && product.id) {
-                    // Only attempt fallback if product ID has a numeric component
-                    if (product.id.includes('/')) {
-                      const parts = product.id.split('/');
-                      const numericId = parts[parts.length - 1];
-                      
-                      if (numericId && /^\d+$/.test(numericId)) {
-                        // Create a fallback ID - note this might not work if variants aren't 1:1 with products
-                        variantId = `gid://shopify/ProductVariant/${numericId}`;
-                        console.warn(`Using fallback variant ID for ${product.title}: ${variantId}`);
-                        isValidVariant = true;
-                      }
-                    }
+                  // If we couldn't find a valid variant ID, log an error
+                  if (!isValidVariant) {
+                    console.error(`No valid variant ID found for product: ${product.title}`);
                   }
-                } catch (error) {
-                  console.error(`Error processing variant for product ${product.title}:`, error);
-                  isValidVariant = false;
-                }
-                
-                // If we couldn't find a valid variant ID, log an error
-                if (!isValidVariant) {
-                  console.error(`No valid variant ID found for product: ${product.title}`);
-                }
-                
-                return (
-                  <motion.div
-                    key={product.id}
-                    variants={fadeIn}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    layout
-                  >
-                    <ProductCard
-                      id={product.id}
-                      name={product.title}
-                      price={product._originalWooProduct?.salePrice || product._originalWooProduct?.price || product.price}
-                      image={product.images[0]?.url || ''}
-                      slug={product.handle}
-                      material={getMetafield(product, 'custom_material', undefined, product.vendor || 'Premium Fabric')}
-                      isNew={true}
-                      stockStatus={product._originalWooProduct?.stockStatus || "IN_STOCK"}
-                      currencySymbol={getCurrencySymbol(product.currencyCode)}
-                      currencyCode={product.currencyCode || 'INR'}
-                      compareAtPrice={product.compareAtPrice}
-                      regularPrice={product._originalWooProduct?.regularPrice}
-                      salePrice={product._originalWooProduct?.salePrice}
-                      onSale={product._originalWooProduct?.onSale || false}
-                      shortDescription={product._originalWooProduct?.shortDescription}
-                      type={product._originalWooProduct?.type}
-                    />
-                  </motion.div>
-                );
-              })}
-            </div>
-            
-            {sortedProducts.length === 0 && !isLoading && (
-              <div className="text-center py-16">
-                <p className="text-[#5c5c52] mb-4">No products found with the selected filters.</p>
-                <button
-                  onClick={() => {
-                    setSelectedMaterials([]);
-                    setPriceRange([0, 25000]);
-                  }}
-                  className="text-[#2c2c27] underline"
-                >
-                  Reset filters
-                </button>
+                  
+                  return (
+                    <motion.div
+                      key={product.id}
+                      variants={fadeIn}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      layout
+                    >
+                      <ProductCard
+                        id={product.id}
+                        name={product.title}
+                        slug={product.handle}
+                        price={product._originalWooProduct?.salePrice || product._originalWooProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
+                        image={product.images[0]?.url || ''}
+                        material={getMetafield(product, 'custom_material', undefined, 'Premium Fabric')}
+                        isNew={true}
+                        stockStatus={product._originalWooProduct?.stockStatus || "IN_STOCK"}
+                        compareAtPrice={product.compareAtPrice}
+                        regularPrice={product._originalWooProduct?.regularPrice}
+                        salePrice={product._originalWooProduct?.salePrice}
+                        onSale={product._originalWooProduct?.onSale || false}
+                        currencySymbol={getCurrencySymbol(product.currencyCode)}
+                        currencyCode={product.currencyCode || 'INR'}
+                        shortDescription={product._originalWooProduct?.shortDescription}
+                        type={product._originalWooProduct?.type}
+                      />
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
-          </div>
+            
+            {!isLoading && sortedProducts.length === 0 && !error && (
+              <div className="text-center py-16">
+                <p className="text-[#5c5c52] mb-4">No products found.</p>
+              </div>
+            )}
         </div>
       </div>
     </div>
   );
-} 
-
+}

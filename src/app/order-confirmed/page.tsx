@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle, Package, Truck, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function OrderConfirmedPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function OrderConfirmedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -143,5 +144,14 @@ export default function OrderConfirmedPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function OrderConfirmedPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto py-12 px-4"><div className="text-center">Loading...</div></div>}>
+      <OrderConfirmedContent />
+    </Suspense>
   );
 }

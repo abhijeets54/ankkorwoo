@@ -36,13 +36,20 @@ const pathVariantMap: Record<string, 'thread' | 'fabric' | 'button'> = {
   '/wishlist': 'thread',
 };
 
-// Separate component that uses useSearchParams
+// Separate component that uses useSearchParams - wrapped to prevent build errors
 const RouteChangeHandler = ({ setIsLoading, setVariant }: {
   setIsLoading: (loading: boolean) => void;
   setVariant: (variant: 'thread' | 'fabric' | 'button') => void;
 }) => {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  // Safely handle useSearchParams to prevent build errors
+  let searchParams;
+  try {
+    searchParams = useSearchParams();
+  } catch (error) {
+    // During build/SSR, useSearchParams might not be available
+    searchParams = null;
+  }
 
   // Set loading state and variant when route changes
   useEffect(() => {

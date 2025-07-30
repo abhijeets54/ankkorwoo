@@ -98,7 +98,7 @@ export async function GET() {
     // Return the user data along with the token for frontend use
     return NextResponse.json({
       success: true,
-      customer: response.customer,
+      user: response.customer, // Use 'user' instead of 'customer' for AuthContext compatibility
       isAuthenticated: true,
       token: token // Include the token in the response for frontend access
     });

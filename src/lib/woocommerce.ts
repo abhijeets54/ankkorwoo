@@ -727,12 +727,22 @@ export const QUERY_CATEGORY_PRODUCTS = gql`
           databaseId
           name
           slug
+          description
+          shortDescription
+          productCategories {
+            nodes {
+              id
+              name
+              slug
+            }
+          }
           ... on SimpleProduct {
             price
             regularPrice
             salePrice
             onSale
             stockStatus
+            stockQuantity
           }
           ... on VariableProduct {
             price
@@ -740,11 +750,40 @@ export const QUERY_CATEGORY_PRODUCTS = gql`
             salePrice
             onSale
             stockStatus
+            variations {
+              nodes {
+                stockStatus
+                stockQuantity
+              }
+            }
           }
           image {
             id
             sourceUrl
             altText
+          }
+          galleryImages {
+            nodes {
+              id
+              sourceUrl
+              altText
+            }
+          }
+          ... on VariableProduct {
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+          ... on SimpleProduct {
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
           }
         }
       }
@@ -1048,15 +1087,85 @@ export async function getAllProducts(first = 20) {
  */
 export async function getAllCategories(first = 20) {
   try {
+    console.log(`🔍 Fetching all categories with first: ${first}`);
+    console.log(`📡 Using GraphQL endpoint: ${process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://your-wordpress-site.com/graphql'}`);
+
     const data = await wooGraphQLFetch({
       query: QUERY_ALL_CATEGORIES,
       variables: { first }
     });
 
-    return data?.productCategories?.nodes || [];
+    console.log(`📊 Raw categories response:`, JSON.stringify(data, null, 2));
+
+    const categories = data?.productCategories?.nodes || [];
+    console.log(`📂 Found ${categories.length} categories:`, categories.map((cat: any) => ({
+      name: cat.name,
+      slug: cat.slug,
+      id: cat.id,
+      databaseId: cat.databaseId,
+      count: cat.count
+    })));
+
+    return categories;
   } catch (error) {
-    console.error('Error fetching all categories:', error);
+    console.error('❌ Error fetching all categories:', error);
+
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error(`Error message: ${error.message}`);
+      console.error(`Error stack: ${error.stack}`);
+    }
+
     return [];
+  }
+}
+
+/**
+ * Test GraphQL connection and list available categories
+ */
+export async function testWooCommerceConnection() {
+  try {
+    console.log('🧪 Testing WooCommerce GraphQL connection...');
+    console.log(`📡 Endpoint: ${process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://your-wordpress-site.com/graphql'}`);
+
+    // Test basic connection with a simple query
+    const testQuery = gql`
+      query TestConnection {
+        generalSettings {
+          title
+          url
+        }
+      }
+    `;
+
+    const testResult = await wooGraphQLFetch({
+      query: testQuery,
+      variables: {}
+    });
+
+    console.log('✅ Basic connection test result:', testResult);
+
+    // Test categories
+    const categories = await getAllCategories(50);
+    console.log(`📂 Available categories (${categories.length}):`, categories);
+
+    // Test products
+    const products = await getAllProducts(10);
+    console.log(`📦 Available products (${products.length}):`, products?.slice(0, 3));
+
+    return {
+      connectionWorking: !!testResult,
+      categoriesCount: categories.length,
+      productsCount: products.length,
+      categories: categories.map((cat: any) => ({ name: cat.name, slug: cat.slug, count: cat.count })),
+      sampleProducts: products?.slice(0, 3).map((prod: any) => ({ name: prod.name, slug: prod.slug }))
+    };
+  } catch (error) {
+    console.error('❌ WooCommerce connection test failed:', error);
+    return {
+      connectionWorking: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }
 
@@ -2200,14 +2309,41 @@ export async function getCategoryProducts(
   try {
     const { first = 20 } = options;
 
-    const data = await graphQLClient.request<{ productCategory: any }>(
-      QUERY_CATEGORY_PRODUCTS,
-      { slug, first }
-    );
+    console.log(`🔍 Fetching category products for slug: "${slug}" with first: ${first}`);
+    console.log(`📡 Using GraphQL endpoint: ${process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://your-wordpress-site.com/graphql'}`);
+
+    const data = await wooGraphQLFetch<{ productCategory: any }>({
+      query: QUERY_CATEGORY_PRODUCTS,
+      variables: { slug, first }
+    });
+
+    console.log(`📊 Raw response for category "${slug}":`, JSON.stringify(data, null, 2));
+
+    if (!data?.productCategory) {
+      console.log(`⚠️ No productCategory found in response for slug: "${slug}"`);
+
+      // Try alternative approach - search by ID if slug doesn't work
+      if (slug && !isNaN(Number(slug))) {
+        console.log(`🔄 Trying to fetch category by ID: ${slug}`);
+        const dataById = await wooGraphQLFetch<{ productCategory: any }>({
+          query: QUERY_CATEGORY_PRODUCTS.replace('idType: SLUG', 'idType: DATABASE_ID'),
+          variables: { slug: Number(slug), first }
+        });
+        console.log(`📊 Response by ID:`, JSON.stringify(dataById, null, 2));
+        return dataById?.productCategory || null;
+      }
+    }
 
     return data?.productCategory || null;
   } catch (error) {
-    console.error(`Error fetching category products with slug ${slug}:`, error);
+    console.error(`❌ Error fetching category products with slug ${slug}:`, error);
+
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error(`Error message: ${error.message}`);
+      console.error(`Error stack: ${error.stack}`);
+    }
+
     return null;
   }
 }

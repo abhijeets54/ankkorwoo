@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Filter, ChevronDown, X } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
-import { getAllProducts, normalizeProductImages, getMetafield } from '@/lib/woocommerce';
+import { getAllProducts, normalizeProduct, getMetafield } from '@/lib/woocommerce';
 import usePageLoading from '@/hooks/usePageLoading';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
 
@@ -26,15 +26,26 @@ interface Product {
   id: string;
   title: string;
   handle: string;
-  price: string;
-  images: ProductImage[];
-  variants: ProductVariant[] | any;
-  metafields: Record<string, string>;
-  productType?: string;
-  tags?: string[];
-  vendor?: string;
-  compareAtPrice?: string | null;
+  description?: string;
+  descriptionHtml?: string;
+  priceRange: {
+    minVariantPrice: {
+      amount: string;
+      currencyCode: string;
+    };
+    maxVariantPrice: {
+      amount: string;
+      currencyCode: string;
+    };
+  };
+  images: Array<{url: string, altText?: string}>;
+  variants: any[];
+  options: any[];
+  collections: any[];
+  availableForSale: boolean;
+  metafields: Record<string, any>;
   currencyCode?: string;
+  _originalWooProduct?: any;
 }
 
 // Filter options
@@ -69,7 +80,7 @@ export default function CollectionPage() {
     const fetchProducts = async () => {
       try {
         setIsLoading(true);
-        const allProducts = await getAllProducts();
+        const allProducts = await getAllProducts(100); // Fetch up to 100 products
         
         if (!allProducts || allProducts.length === 0) {
           setError('No products found. Please check your WooCommerce store configuration.');
@@ -77,52 +88,17 @@ export default function CollectionPage() {
           return;
         }
         
-        // Transform products to match our interface
-        const transformedProducts = allProducts.map((product: any) => {
-          // Use the utility function to safely extract images
-          const productImages = normalizeProductImages(product);
-          
-          // Extract variants properly handling both formats
-          let normalizedVariants: ProductVariant[] = [];
-          
-          try {
-            // Handle GraphQL edges/node format
-            if (product.variants?.edges) {
-              normalizedVariants = product.variants.edges.map((edge: any) => ({
-                id: edge.node.id,
-                title: edge.node.title,
-                price: edge.node.price?.amount,
-                compareAtPrice: edge.node.compareAtPrice?.amount,
-                currencyCode: edge.node.price?.currencyCode
-              }));
-            } 
-            // Handle already normalized array format
-            else if (Array.isArray(product.variants)) {
-              normalizedVariants = product.variants;
+        // Normalize the products using the same function as homepage
+        const transformedProducts = allProducts
+          .map((product: any) => {
+            const normalizedProduct = normalizeProduct(product);
+            // Ensure currencyCode is included for use with currency symbols
+            if (normalizedProduct) {
+              normalizedProduct.currencyCode = 'INR'; // Default to INR or get from WooCommerce settings
             }
-          } catch (error) {
-            console.error(`Error normalizing variants for product ${product.title}:`, error);
-          }
-          
-          return {
-            id: product.id,
-            title: product.title || "Untitled Product",
-            handle: product.handle || "",
-            price: product.priceRange?.minVariantPrice?.amount || 
-                   (normalizedVariants[0]?.price) || 
-                   "0.00",
-            images: productImages,
-            variants: normalizedVariants,
-            metafields: product.metafields || {},
-            productType: product.productType || '',
-            tags: Array.isArray(product.tags) ? product.tags : [],
-            vendor: product.vendor || '',
-            compareAtPrice: normalizedVariants[0]?.compareAtPrice || null,
-            currencyCode: product.priceRange?.minVariantPrice?.currencyCode || 
-                         normalizedVariants[0]?.currencyCode ||
-                         'INR'
-          };
-        });
+            return normalizedProduct;
+          })
+          .filter(Boolean);
         
         setProducts(transformedProducts);
         console.log(`Successfully fetched ${transformedProducts.length} products from WooCommerce`);
@@ -137,17 +113,28 @@ export default function CollectionPage() {
     fetchProducts();
   }, []);
   
-  // Determine product category based on productType or tags
+  // Determine product category based on collections or original product data
   const getCategoryFromProduct = (product: Product): string => {
-    const productType = product.productType?.toLowerCase() || '';
-    const tags = product.tags?.map(tag => tag.toLowerCase()) || [];
-    
-    if (productType.includes('shirt') || tags.some(tag => tag.includes('shirt'))) {
+    // Check collections first
+    const collections = product.collections || [];
+    const collectionSlugs = collections.map((col: any) => col.handle?.toLowerCase() || '');
+
+    // Check original product data
+    const originalProduct = product._originalWooProduct;
+    const productType = originalProduct?.type?.toLowerCase() || '';
+    const categories = originalProduct?.productCategories?.nodes || [];
+    const categoryNames = categories.map((cat: any) => cat.name?.toLowerCase() || '');
+
+    if (collectionSlugs.some(slug => slug.includes('shirt')) ||
+        categoryNames.some(name => name.includes('shirt')) ||
+        productType.includes('shirt')) {
       return 'shirts';
-    } else if (productType.includes('polo') || tags.some(tag => tag.includes('polo'))) {
+    } else if (collectionSlugs.some(slug => slug.includes('polo')) ||
+               categoryNames.some(name => name.includes('polo')) ||
+               productType.includes('polo')) {
       return 'polos';
     }
-    
+
     return 'other';
   };
   
@@ -160,9 +147,13 @@ export default function CollectionPage() {
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     switch (selectedSort) {
       case 'price-asc':
-        return parseFloat(a.price) - parseFloat(b.price);
+        const priceA = parseFloat(a.priceRange?.minVariantPrice?.amount || '0');
+        const priceB = parseFloat(b.priceRange?.minVariantPrice?.amount || '0');
+        return priceA - priceB;
       case 'price-desc':
-        return parseFloat(b.price) - parseFloat(a.price);
+        const priceDescA = parseFloat(a.priceRange?.minVariantPrice?.amount || '0');
+        const priceDescB = parseFloat(b.priceRange?.minVariantPrice?.amount || '0');
+        return priceDescB - priceDescA;
       case 'rating':
         // Sort by title as an alternative since rating is removed
         return a.title.localeCompare(b.title);
@@ -400,22 +391,25 @@ export default function CollectionPage() {
                   }
                   
                   // Return the product card component with the product data
+                  const originalProduct = product._originalWooProduct;
                   return (
                     <ProductCard
                       key={product.id}
                       id={product.id}
                       name={product.title}
                       slug={product.handle}
-                      price={product._originalWooProduct?.salePrice || product._originalWooProduct?.price || product.price}
-                      compareAtPrice={product.compareAtPrice}
-                      currencyCode={product.currencyCode}
+                      price={originalProduct?.salePrice || originalProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
                       image={product.images[0]?.url || ''}
-                      stockStatus={product._originalWooProduct?.stockStatus || "IN_STOCK"}
-                      regularPrice={product._originalWooProduct?.regularPrice}
-                      salePrice={product._originalWooProduct?.salePrice}
-                      onSale={product._originalWooProduct?.onSale || false}
-                      shortDescription={product._originalWooProduct?.shortDescription}
-                      type={product._originalWooProduct?.type}
+                      isNew={true}
+                      stockStatus={originalProduct?.stockStatus || "IN_STOCK"}
+                      compareAtPrice={product.compareAtPrice}
+                      regularPrice={originalProduct?.regularPrice}
+                      salePrice={originalProduct?.salePrice}
+                      onSale={originalProduct?.onSale || false}
+                      currencySymbol={getCurrencySymbol(product.currencyCode)}
+                      currencyCode={product.currencyCode || 'INR'}
+                      shortDescription={originalProduct?.shortDescription}
+                      type={originalProduct?.type}
                     />
                   );
                 } catch (error) {
