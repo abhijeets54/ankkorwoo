@@ -250,9 +250,12 @@ export async function releaseReservation(reservationId: string): Promise<boolean
 async function getTotalStockFromWooCommerce(productId: string, variationId?: string): Promise<number | null> {
   // This would make an API call to your stock endpoint
   try {
-    const response = await fetch(`/api/products/${productId}/stock${variationId ? `?variation_id=${variationId}` : ''}`);
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ankkorwoo.vercel.app';
+    const url = `${baseUrl}/api/products/${productId}/stock${variationId ? `?variation_id=${variationId}` : ''}`;
+
+    const response = await fetch(url);
     if (!response.ok) return null;
-    
+
     const data = await response.json();
     return data.stockQuantity || 0;
   } catch (error) {

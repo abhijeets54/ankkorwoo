@@ -21,10 +21,15 @@ const GET_PRODUCTS_STOCK = gql`
       nodes {
         id
         databaseId
-        stockStatus
-        stockQuantity
-        manageStock
+        ... on SimpleProduct {
+          stockStatus
+          stockQuantity
+          manageStock
+        }
         ... on VariableProduct {
+          stockStatus
+          stockQuantity
+          manageStock
           variations {
             nodes {
               id
@@ -34,6 +39,12 @@ const GET_PRODUCTS_STOCK = gql`
               manageStock
             }
           }
+        }
+        ... on ExternalProduct {
+          stockStatus
+        }
+        ... on GroupProduct {
+          stockStatus
         }
       }
     }

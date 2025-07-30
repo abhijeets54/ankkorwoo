@@ -16,14 +16,19 @@ const graphQLClient = new GraphQLClient(endpoint);
 
 // GraphQL query for product stock
 const GET_PRODUCT_STOCK = gql`
-  query GetProductStock($id: ID!, $idType: ProductIdType = DATABASE_ID) {
+  query GetProductStock($id: ID!, $idType: ProductIdTypeEnum = DATABASE_ID) {
     product(id: $id, idType: $idType) {
       id
       databaseId
-      stockStatus
-      stockQuantity
-      manageStock
+      ... on SimpleProduct {
+        stockStatus
+        stockQuantity
+        manageStock
+      }
       ... on VariableProduct {
+        stockStatus
+        stockQuantity
+        manageStock
         variations {
           nodes {
             id
@@ -33,6 +38,12 @@ const GET_PRODUCT_STOCK = gql`
             manageStock
           }
         }
+      }
+      ... on ExternalProduct {
+        stockStatus
+      }
+      ... on GroupProduct {
+        stockStatus
       }
     }
   }
