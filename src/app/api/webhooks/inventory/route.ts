@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 import * as wooInventoryMapping from '@/lib/wooInventoryMapping';
 
-// Initialize Redis
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+// Initialize Redis with fallback handling
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
 
 // Cache TTL constants
 const CACHE_TTL = {
@@ -181,7 +183,7 @@ async function handleProductCreated(product: any) {
           _stockUpdateSource: 'webhook_created'
         };
 
-        await redis.set(productKey, productData, CACHE_TTL.PRODUCTS);
+        await redis.set(productKey, productData, { ex: CACHE_TTL.PRODUCTS });
         console.log(`Cached new product ${slug}`);
       } catch (cacheError) {
         console.warn('Cache creation failed:', cacheError);

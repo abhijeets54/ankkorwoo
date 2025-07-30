@@ -3,7 +3,7 @@ import { Redis } from '@upstash/redis';
 import * as wooInventoryMapping from '@/lib/wooInventoryMapping';
 
 // Initialize Redis with fallback handling
-const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN 
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
   ? new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,

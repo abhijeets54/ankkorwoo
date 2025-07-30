@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 
 // Initialize Redis with fallback handling
-const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN 
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
   ? new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       // Function to check for stock updates
       const checkStockUpdates = async () => {
         if (!redis) {
+          console.log('Redis not available, skipping stock update check');
           return;
         }
 
@@ -57,11 +58,30 @@ export async function GET(request: NextRequest) {
           }
         } catch (error) {
           console.error('Error checking stock updates:', error);
+
+          // Send error notification to client
+          controller.enqueue(`data: ${JSON.stringify({
+            type: 'error',
+            message: 'Stock update service temporarily unavailable',
+            timestamp: new Date().toISOString()
+          })}\n\n`);
         }
       };
 
-      // Check for updates every 5 seconds
-      const interval = setInterval(checkStockUpdates, 5000);
+      // Check for updates every 5 seconds (only if Redis is available)
+      let interval: NodeJS.Timeout | null = null;
+      if (redis) {
+        interval = setInterval(checkStockUpdates, 5000);
+        console.log('Started stock updates polling (Redis available)');
+      } else {
+        console.log('Redis not available, stock updates polling disabled');
+        // Send notification to client that real-time updates are not available
+        controller.enqueue(`data: ${JSON.stringify({
+          type: 'service_unavailable',
+          message: 'Real-time stock updates are currently unavailable',
+          timestamp: new Date().toISOString()
+        })}\n\n`);
+      }
 
       // Send heartbeat every 30 seconds to keep connection alive
       const heartbeat = setInterval(() => {
@@ -73,7 +93,7 @@ export async function GET(request: NextRequest) {
 
       // Cleanup function
       const cleanup = () => {
-        clearInterval(interval);
+        if (interval) clearInterval(interval);
         clearInterval(heartbeat);
         controller.close();
       };
