@@ -99,10 +99,28 @@ export async function POST(request: NextRequest) {
     // Skip signature verification for now to debug
     console.log('Skipping signature verification for debugging');
 
+    // Determine webhook type from headers or URL
+    const webhookTopic = request.headers.get('x-wc-webhook-topic') || 'product.updated';
+    console.log('Webhook topic:', webhookTopic);
+
     // Process the webhook
     try {
-      await handleProductUpdate(webhookData);
-      console.log('Product update handled successfully');
+      // Handle different webhook types
+      switch (webhookTopic) {
+        case 'product.created':
+          await handleProductCreated(webhookData);
+          break;
+        case 'product.updated':
+          await handleProductUpdate(webhookData);
+          break;
+        case 'product.deleted':
+          await handleProductDeleted(webhookData);
+          break;
+        default:
+          console.log('Handling as product update (default)');
+          await handleProductUpdate(webhookData);
+      }
+      console.log('Webhook handled successfully');
     } catch (updateError) {
       console.error('Error in handleProductUpdate:', updateError);
       // Don't fail the webhook for processing errors
@@ -129,6 +147,92 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 200 }); // Changed to 200 to prevent retries
+  }
+}
+
+async function handleProductCreated(product: any) {
+  try {
+    if (!product || !product.id) {
+      console.error('Invalid product data received:', product);
+      return;
+    }
+
+    const productId = product.id.toString();
+    const slug = product.slug;
+
+    console.log(`Processing new product creation: ${slug} (ID: ${productId})`);
+
+    // Add inventory mapping for new product
+    await wooInventoryMapping.addInventoryMapping(productId, slug);
+
+    // Cache the new product (only if Redis is available)
+    if (redis) {
+      try {
+        const productKey = `product:${slug}`;
+        const productData = {
+          id: product.id,
+          databaseId: product.id,
+          name: product.name,
+          slug: product.slug,
+          stockStatus: product.stock_status,
+          stockQuantity: product.stock_quantity,
+          availableForSale: product.stock_status === 'instock',
+          _lastInventoryUpdate: new Date().toISOString(),
+          _stockUpdateSource: 'webhook_created'
+        };
+
+        await redis.set(productKey, productData, CACHE_TTL.PRODUCTS);
+        console.log(`Cached new product ${slug}`);
+      } catch (cacheError) {
+        console.warn('Cache creation failed:', cacheError);
+      }
+    }
+
+    // Broadcast product creation
+    await broadcastStockUpdate(productId, {
+      type: 'product_created',
+      stockStatus: product.stock_status,
+      stockQuantity: product.stock_quantity,
+      availableForSale: product.stock_status === 'instock'
+    });
+
+  } catch (error) {
+    console.error('Error handling product creation:', error);
+  }
+}
+
+async function handleProductDeleted(product: any) {
+  try {
+    if (!product || !product.id) {
+      console.error('Invalid product data received:', product);
+      return;
+    }
+
+    const productId = product.id.toString();
+    const slug = product.slug;
+
+    console.log(`Processing product deletion: ${slug} (ID: ${productId})`);
+
+    // Remove from cache (only if Redis is available)
+    if (redis) {
+      try {
+        const productKey = `product:${slug}`;
+        await redis.del(productKey);
+        console.log(`Removed product ${slug} from cache`);
+      } catch (cacheError) {
+        console.warn('Cache deletion failed:', cacheError);
+      }
+    }
+
+    // Broadcast product deletion
+    await broadcastStockUpdate(productId, {
+      type: 'product_deleted',
+      stockStatus: 'deleted',
+      availableForSale: false
+    });
+
+  } catch (error) {
+    console.error('Error handling product deletion:', error);
   }
 }
 

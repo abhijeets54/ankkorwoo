@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart/CartProvider';
-import { Minus, Plus, ShoppingBag } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Wifi, WifiOff } from 'lucide-react';
+import { useProductStockUpdates } from '@/hooks/useStockUpdates';
 
 interface ProductDetailProps {
   product: any;
@@ -21,7 +22,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
   
   const cartStore = useLocalCartStore();
   const { openCart } = useCart();
-  
+
   // Extract product data
   const {
     id,
@@ -39,6 +40,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
     type,
     variations
   } = product;
+
+  // Real-time stock updates
+  const { stockData, isConnected } = useProductStockUpdates(databaseId?.toString() || '', true);
+
+  // Use real-time stock data if available, otherwise fall back to product data
+  const currentStockStatus = stockData.stockStatus || stockStatus;
+  const currentStockQuantity = stockData.stockQuantity;
   
   // Determine if product is a variable product
   const isVariableProduct = type === 'VARIABLE';
@@ -115,8 +123,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
     }
   };
   
-  // Check if product is out of stock
-  const isOutOfStock = stockStatus !== 'IN_STOCK';
+  // Check if product is out of stock (use real-time data if available)
+  const isOutOfStock = (currentStockStatus || stockStatus) !== 'IN_STOCK' &&
+                       (currentStockStatus || stockStatus) !== 'instock';
   
   // Check if product can be added to cart (has all required attributes selected for variable products)
   const canAddToCart = !isVariableProduct || (isVariableProduct && selectedVariant);
@@ -244,10 +253,41 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
           
           {/* Stock Status */}
           <div className="text-sm">
-            <span className="font-medium">Availability: </span>
-            <span className={isOutOfStock ? 'text-red-600' : 'text-green-600'}>
-              {isOutOfStock ? 'Out of Stock' : 'In Stock'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Availability: </span>
+              <span className={isOutOfStock ? 'text-red-600' : 'text-green-600'}>
+                {isOutOfStock ? 'Out of Stock' : 'In Stock'}
+              </span>
+              {/* Real-time connection indicator */}
+              {isConnected && (
+                <div className="flex items-center gap-1 text-xs text-green-600">
+                  <Wifi className="h-3 w-3" />
+                  <span>Live</span>
+                </div>
+              )}
+              {!isConnected && stockData.lastUpdated && (
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <WifiOff className="h-3 w-3" />
+                  <span>Offline</span>
+                </div>
+              )}
+            </div>
+            {/* Show stock quantity if available */}
+            {currentStockQuantity !== undefined && currentStockQuantity !== null && (
+              <div className="text-xs text-gray-600 mt-1">
+                {currentStockQuantity > 0 ? (
+                  <span>{currentStockQuantity} items available</span>
+                ) : (
+                  <span className="text-red-600">No items in stock</span>
+                )}
+              </div>
+            )}
+            {/* Show last update time */}
+            {stockData.lastUpdated && (
+              <div className="text-xs text-gray-500 mt-1">
+                Last updated: {new Date(stockData.lastUpdated).toLocaleTimeString()}
+              </div>
+            )}
           </div>
           
           {/* Add to Cart Button */}
