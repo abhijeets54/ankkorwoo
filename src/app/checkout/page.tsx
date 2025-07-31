@@ -11,9 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Truck, CreditCard } from 'lucide-react';
-import LocationDetector from '@/components/checkout/LocationDetector';
 import StateCitySelector from '@/components/checkout/StateCitySelector';
-import { LocationData, getLocationFromPincode } from '@/lib/locationUtils';
+import { getLocationFromPincode } from '@/lib/locationUtils';
 
 interface CheckoutFormData {
   firstName: string;
@@ -32,7 +31,6 @@ export default function CheckoutPage() {
   const cartStore = useLocalCartStore();
   const checkoutStore = useCheckoutStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CheckoutFormData>({
     mode: 'onChange'
@@ -71,12 +69,12 @@ export default function CheckoutPage() {
     loadRazorpayScript();
   }, []);
 
-  // Fetch shipping rates when pincode changes
+  // Fetch shipping rates when pincode or state changes
   useEffect(() => {
-    if (pincode && pincode.length === 6 && isAuthenticated) {
-      checkoutStore.fetchShippingRates(pincode);
+    if (pincode && pincode.length === 6 && state && isAuthenticated) {
+      checkoutStore.fetchShippingRates(pincode, state);
     }
-  }, [pincode, isAuthenticated]); // Removed checkoutStore from dependencies
+  }, [pincode, state, isAuthenticated]); // Removed checkoutStore from dependencies
 
   // Auto-fill state and city when pincode is entered
   useEffect(() => {
@@ -86,11 +84,14 @@ export default function CheckoutPage() {
           const locationData = await getLocationFromPincode(pincode);
           if (locationData.state) {
             setValue('state', locationData.state);
+            // Trigger shipping calculation with the new state
+            if (isAuthenticated) {
+              checkoutStore.fetchShippingRates(pincode, locationData.state);
+            }
           }
           if (locationData.city) {
             setValue('city', locationData.city);
           }
-          setLocationError(null);
         } catch (error) {
           console.error('Error fetching location from pincode:', error);
           // Don't show error for pincode lookup failure
@@ -99,16 +100,9 @@ export default function CheckoutPage() {
 
       fetchLocationFromPincode();
     }
-  }, [pincode, setValue]);
+  }, [pincode, setValue, isAuthenticated]);
 
-  const handleLocationDetected = (location: LocationData) => {
-    // Location detected but we need manual entry for now
-    setLocationError(null);
-  };
 
-  const handleLocationError = (error: string) => {
-    setLocationError(error);
-  };
 
   const onSubmit = async (data: CheckoutFormData) => {
     // Set shipping address in store
@@ -282,11 +276,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {locationError && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded">
-          {locationError}
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Checkout Form */}
@@ -297,12 +287,6 @@ export default function CheckoutPage() {
               <Truck className="mr-2 h-5 w-5" />
               Shipping Address
             </h2>
-
-            <LocationDetector
-              onLocationDetected={handleLocationDetected}
-              onError={handleLocationError}
-              disabled={isSubmitting}
-            />
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -64,7 +64,7 @@ interface CheckoutState {
   // Actions
   setCart: (cart: CartItem[]) => void;
   setShippingAddress: (address: ShippingAddress) => void;
-  fetchShippingRates: (pincode: string) => Promise<void>;
+  fetchShippingRates: (pincode: string, state?: string) => Promise<void>;
   setSelectedShipping: (option: ShippingOption) => void;
   calculateFinalAmount: () => void;
   setError: (error: string | null) => void;
@@ -106,7 +106,7 @@ export const useCheckoutStore = create<CheckoutState>()(
         set({ shippingAddress: address });
       },
 
-      fetchShippingRates: async (pincode) => {
+      fetchShippingRates: async (pincode, state) => {
         const { cart, subtotal } = get();
 
         if (!pincode || pincode.length < 6) {
@@ -117,7 +117,7 @@ export const useCheckoutStore = create<CheckoutState>()(
         set({ isLoadingShipping: true, error: null });
 
         try {
-          const shippingOptions = await getShippingRates(pincode, cart);
+          const shippingOptions = await getShippingRates(pincode, cart, state);
 
           // Automatically select the single shipping option
           const selectedShipping = shippingOptions.length > 0 ? shippingOptions[0] : null;

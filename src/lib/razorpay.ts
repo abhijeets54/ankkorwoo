@@ -234,7 +234,8 @@ export const initializeRazorpayCheckout = (options: RazorpayOptions): Promise<Ra
  */
 export const getShippingRates = async (
   pincode: string,
-  cartItems: any[]
+  cartItems: any[],
+  state?: string
 ): Promise<any[]> => {
   try {
     const response = await fetch('/api/shipping-rates', {
@@ -245,6 +246,7 @@ export const getShippingRates = async (
       body: JSON.stringify({
         pincode,
         cartItems,
+        state,
       }),
     });
 

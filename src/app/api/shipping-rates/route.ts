@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { pincode, cartItems } = body;
+    const { pincode, cartItems, state } = body;
 
     // Validate input
     if (!pincode || !cartItems || !Array.isArray(cartItems)) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       shippingRates = await getDelhiveryShippingRates(pincode, cartItems);
     } else {
       // Fallback to basic calculation
-      shippingRates = await getBasicShippingRates(pincode, cartItems);
+      shippingRates = await getBasicShippingRates(pincode, cartItems, state);
     }
 
     return NextResponse.json(shippingRates);
@@ -133,7 +133,7 @@ async function getWooCommerceShippingRates(pincode: string, cartItems: any[]): P
 
     // If no rates found, provide default rates
     if (shippingRates.length === 0) {
-      return getBasicShippingRates(pincode, cartItems);
+      return getBasicShippingRates(pincode, cartItems, state);
     }
 
     return shippingRates;
@@ -170,7 +170,7 @@ async function getDelhiveryShippingRates(pincode: string, cartItems: any[]): Pro
   }
 }
 
-async function getBasicShippingRates(pincode: string, cartItems: any[]): Promise<any[]> {
+async function getBasicShippingRates(pincode: string, cartItems: any[], providedState?: string): Promise<any[]> {
   const { calculateShippingCost, getLocationFromPincode } = await import('@/lib/locationUtils');
 
   const totalValue = cartItems.reduce((sum: number, item: any) => {
@@ -178,20 +178,24 @@ async function getBasicShippingRates(pincode: string, cartItems: any[]): Promise
     return sum + (price * item.quantity);
   }, 0);
 
-  let state = '';
+  let state = providedState || '';
   let shippingCost = 99; // Default for other states
 
-  try {
-    // Get state from pincode
-    const locationData = await getLocationFromPincode(pincode);
-    state = locationData.state || '';
-
-    // Calculate shipping cost based on your rules
+  // If state is provided, use it directly
+  if (providedState) {
+    state = providedState;
     shippingCost = calculateShippingCost(state, totalValue);
-  } catch (error) {
-    console.error('Error getting location from pincode:', error);
-    // Fallback: assume non-Punjab state
-    shippingCost = totalValue > 2999 ? 0 : 99;
+  } else {
+    // Fallback: try to get state from pincode
+    try {
+      const locationData = await getLocationFromPincode(pincode);
+      state = locationData.state || '';
+      shippingCost = calculateShippingCost(state, totalValue);
+    } catch (error) {
+      console.error('Error getting location from pincode:', error);
+      // Fallback: assume non-Punjab state
+      shippingCost = totalValue > 2999 ? 0 : 99;
+    }
   }
 
   const shippingRates = [];
