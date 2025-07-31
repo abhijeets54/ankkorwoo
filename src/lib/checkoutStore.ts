@@ -109,15 +109,15 @@ export const useCheckoutStore = create<CheckoutState>()(
       fetchShippingRates: async (pincode, state) => {
         const { cart, subtotal } = get();
 
-        if (!pincode || pincode.length < 6) {
-          set({ error: 'Please enter a valid pincode' });
+        if (!state) {
+          set({ error: 'Please select a state' });
           return;
         }
 
         set({ isLoadingShipping: true, error: null });
 
         try {
-          const shippingOptions = await getShippingRates(pincode, cart, state);
+          const shippingOptions = await getShippingRates(pincode || '000000', cart, state);
 
           // Automatically select the single shipping option
           const selectedShipping = shippingOptions.length > 0 ? shippingOptions[0] : null;

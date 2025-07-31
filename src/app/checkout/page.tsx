@@ -46,10 +46,6 @@ export default function CheckoutPage() {
   const pincode = watch('pincode');
   const state = watch('state');
   const city = watch('city');
-  const firstName = watch('firstName');
-  const lastName = watch('lastName');
-  const address1 = watch('address1');
-  const phone = watch('phone');
 
   // Initialize cart data in checkout store
   useEffect(() => {
@@ -73,18 +69,14 @@ export default function CheckoutPage() {
     loadRazorpayScript();
   }, []);
 
-  // Fetch shipping rates when address is complete
+  // Fetch shipping rates when state changes (regardless of other fields)
   useEffect(() => {
-    if (pincode && pincode.length === 6 && state && isAuthenticated && isAddressComplete()) {
-      checkoutStore.fetchShippingRates(pincode, state);
+    if (state && isAuthenticated) {
+      checkoutStore.fetchShippingRates(pincode || '000000', state);
     }
-  }, [pincode, state, firstName, lastName, address1, city, phone, isAuthenticated]); // Watch individual form fields
+  }, [state, isAuthenticated]); // Only watch state and auth status
 
-  // Check if all required address fields are filled
-  const isAddressComplete = () => {
-    return firstName && lastName && address1 &&
-           city && state && pincode && phone;
-  };
+
 
   // Auto-fill state and city when pincode is entered
   useEffect(() => {
@@ -405,9 +397,9 @@ export default function CheckoutPage() {
               </p>
             </div>
 
-            {!isAddressComplete() ? (
+            {!state ? (
               <div className="text-gray-500 py-4">
-                Please complete your address to see shipping options
+                Please select a state to see shipping options
               </div>
             ) : checkoutStore.isLoadingShipping ? (
               <div className="flex items-center justify-center py-8">
@@ -511,8 +503,8 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span>
-                    {!isAddressComplete()
-                      ? 'Enter address'
+                    {!state
+                      ? 'Select state'
                       : checkoutStore.selectedShipping
                         ? checkoutStore.selectedShipping.cost === 0
                           ? 'Free'

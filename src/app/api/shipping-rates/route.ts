@@ -180,25 +180,21 @@ async function getBasicShippingRates(pincode: string, cartItems: any[], provided
 
 
 
+  // Always prioritize provided state over pincode lookup
   let state = providedState || '';
   let shippingCost = 99; // Default for other states
 
-  // If state is provided, use it directly
   if (providedState) {
+    // Use the selected state directly - this is the main logic
     state = providedState;
     shippingCost = calculateShippingCost(state, totalValue);
 
   } else {
-    // Fallback: try to get state from pincode
-    try {
-      const locationData = await getLocationFromPincode(pincode);
-      state = locationData.state || '';
-      shippingCost = calculateShippingCost(state, totalValue);
-    } catch (error) {
-      console.error('Error getting location from pincode:', error);
-      // Fallback: assume non-Punjab state
-      shippingCost = totalValue > 2999 ? 0 : 99;
-    }
+    // Only fallback to pincode if no state is provided
+    return NextResponse.json(
+      { error: 'Please select a state to calculate shipping' },
+      { status: 400 }
+    );
   }
 
   const shippingRates = [];
