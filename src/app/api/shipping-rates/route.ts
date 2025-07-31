@@ -178,6 +178,8 @@ async function getBasicShippingRates(pincode: string, cartItems: any[], provided
     return sum + (price * item.quantity);
   }, 0);
 
+
+
   let state = providedState || '';
   let shippingCost = 99; // Default for other states
 
@@ -185,6 +187,7 @@ async function getBasicShippingRates(pincode: string, cartItems: any[], provided
   if (providedState) {
     state = providedState;
     shippingCost = calculateShippingCost(state, totalValue);
+
   } else {
     // Fallback: try to get state from pincode
     try {
@@ -201,16 +204,13 @@ async function getBasicShippingRates(pincode: string, cartItems: any[], provided
   const shippingRates = [];
 
   // Single shipping method with automatic pricing
-  const shippingName = shippingCost === 0 ? 'Free Shipping' : 'Standard Shipping';
-  const description = shippingCost === 0
-    ? 'Free shipping on orders above ₹2999'
-    : 'Standard delivery across India';
+  const shippingName = 'Standard Shipping';
 
   shippingRates.push({
     id: 'standard',
     name: shippingName,
     cost: shippingCost,
-    description: description,
+    description: 'Standard delivery across India',
     estimatedDays: '5-7 days',
     state: state
   });

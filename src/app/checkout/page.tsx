@@ -69,12 +69,19 @@ export default function CheckoutPage() {
     loadRazorpayScript();
   }, []);
 
-  // Fetch shipping rates when pincode or state changes
+  // Fetch shipping rates when address is complete
   useEffect(() => {
-    if (pincode && pincode.length === 6 && state && isAuthenticated) {
+    if (pincode && pincode.length === 6 && state && isAuthenticated && isAddressComplete()) {
       checkoutStore.fetchShippingRates(pincode, state);
     }
-  }, [pincode, state, isAuthenticated]); // Removed checkoutStore from dependencies
+  }, [pincode, state, isAuthenticated, watch()]); // Watch all form fields
+
+  // Check if all required address fields are filled
+  const isAddressComplete = () => {
+    const formData = watch();
+    return formData.firstName && formData.lastName && formData.address1 &&
+           formData.city && formData.state && formData.pincode && formData.phone;
+  };
 
   // Auto-fill state and city when pincode is entered
   useEffect(() => {
@@ -388,7 +395,18 @@ export default function CheckoutPage() {
               Shipping Information
             </h2>
 
-            {checkoutStore.isLoadingShipping ? (
+            {/* Free shipping reminder */}
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">
+                🚚 Free shipping on orders above ₹2999
+              </p>
+            </div>
+
+            {!isAddressComplete() ? (
+              <div className="text-gray-500 py-4">
+                Please complete your address to see shipping options
+              </div>
+            ) : checkoutStore.isLoadingShipping ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
                 <span>Calculating shipping cost...</span>
@@ -397,9 +415,8 @@ export default function CheckoutPage() {
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium">{checkoutStore.selectedShipping.name}</h3>
-                    <p className="text-sm text-gray-600">{checkoutStore.selectedShipping.description}</p>
-                    <p className="text-sm text-gray-500">Estimated delivery: {checkoutStore.selectedShipping.estimatedDays}</p>
+                    <h3 className="font-medium">Standard Shipping</h3>
+                    <p className="text-sm text-gray-500">Estimated delivery: 5-7 days</p>
                   </div>
                   <div className="text-lg font-medium">
                     {checkoutStore.selectedShipping.cost === 0 ? 'Free' : `₹${checkoutStore.selectedShipping.cost.toFixed(2)}`}
@@ -408,10 +425,7 @@ export default function CheckoutPage() {
               </div>
             ) : (
               <div className="text-gray-500 py-4">
-                {pincode && pincode.length === 6
-                  ? 'Unable to calculate shipping for this pincode'
-                  : 'Enter a valid pincode to calculate shipping cost'
-                }
+                Unable to calculate shipping for this address
               </div>
             )}
           </div>
@@ -494,11 +508,13 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span>
-                    {checkoutStore.selectedShipping
-                      ? checkoutStore.selectedShipping.cost === 0
-                        ? 'Free'
-                        : `₹${checkoutStore.selectedShipping.cost.toFixed(2)}`
-                      : 'TBD'
+                    {!isAddressComplete()
+                      ? 'Enter address'
+                      : checkoutStore.selectedShipping
+                        ? checkoutStore.selectedShipping.cost === 0
+                          ? 'Free'
+                          : `₹${checkoutStore.selectedShipping.cost.toFixed(2)}`
+                        : 'Calculating...'
                     }
                   </span>
                 </div>
