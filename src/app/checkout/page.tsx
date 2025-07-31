@@ -134,7 +134,7 @@ export default function CheckoutPage() {
     }
 
     if (!checkoutStore.selectedShipping) {
-      checkoutStore.setError('Please select a shipping method');
+      checkoutStore.setError('Shipping cost not calculated. Please enter a valid pincode.');
       return;
     }
 
@@ -397,64 +397,37 @@ export default function CheckoutPage() {
             </form>
           </div>
 
-          {/* Shipping Options */}
+          {/* Shipping Information */}
           <div className="bg-white p-6 border rounded-lg shadow-sm">
             <h2 className="text-xl font-medium mb-4 flex items-center">
               <Truck className="mr-2 h-5 w-5" />
-              Shipping Options
+              Shipping Information
             </h2>
 
             {checkoutStore.isLoadingShipping ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span>Loading shipping options...</span>
+                <span>Calculating shipping cost...</span>
               </div>
-            ) : checkoutStore.shippingOptions.length === 0 ? (
-              <div className="text-gray-500 py-4">
-                {pincode && pincode.length === 6
-                  ? 'No shipping options available for this pincode'
-                  : 'Enter a valid pincode to see shipping options'
-                }
+            ) : checkoutStore.selectedShipping ? (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">{checkoutStore.selectedShipping.name}</h3>
+                    <p className="text-sm text-gray-600">{checkoutStore.selectedShipping.description}</p>
+                    <p className="text-sm text-gray-500">Estimated delivery: {checkoutStore.selectedShipping.estimatedDays}</p>
+                  </div>
+                  <div className="text-lg font-medium">
+                    {checkoutStore.selectedShipping.cost === 0 ? 'Free' : `₹${checkoutStore.selectedShipping.cost.toFixed(2)}`}
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {checkoutStore.shippingOptions.map((option) => (
-                  <div
-                    key={option.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                      checkoutStore.selectedShipping?.id === option.id
-                        ? 'border-[#2c2c27] bg-gray-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => checkoutStore.setSelectedShipping(option)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="shipping"
-                            checked={checkoutStore.selectedShipping?.id === option.id}
-                            onChange={() => checkoutStore.setSelectedShipping(option)}
-                            className="mr-3"
-                          />
-                          <div>
-                            <h3 className="font-medium">{option.name}</h3>
-                            {option.description && (
-                              <p className="text-sm text-gray-600">{option.description}</p>
-                            )}
-                            {option.estimatedDays && (
-                              <p className="text-sm text-gray-500">Estimated delivery: {option.estimatedDays}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-lg font-medium">
-                        {option.cost === 0 ? 'Free' : `₹${option.cost.toFixed(2)}`}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="text-gray-500 py-4">
+                {pincode && pincode.length === 6
+                  ? 'Unable to calculate shipping for this pincode'
+                  : 'Enter a valid pincode to calculate shipping cost'
+                }
               </div>
             )}
           </div>

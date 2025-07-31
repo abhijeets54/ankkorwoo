@@ -118,14 +118,17 @@ export const useCheckoutStore = create<CheckoutState>()(
 
         try {
           const shippingOptions = await getShippingRates(pincode, cart);
-          // Reset shipping cost to 0 and recalculate final amount
-          const finalAmount = subtotal + 0;
+
+          // Automatically select the single shipping option
+          const selectedShipping = shippingOptions.length > 0 ? shippingOptions[0] : null;
+          const shippingCost = selectedShipping ? selectedShipping.cost : 0;
+          const finalAmount = subtotal + shippingCost;
 
           set({
             shippingOptions,
             isLoadingShipping: false,
-            selectedShipping: null,
-            shippingCost: 0,
+            selectedShipping,
+            shippingCost,
             finalAmount
           });
         } catch (error) {

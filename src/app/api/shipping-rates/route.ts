@@ -113,12 +113,20 @@ async function getWooCommerceShippingRates(pincode: string, cartItems: any[]): P
 
             shippingRates.push({
               id: `${zone.id}_${method.instance_id}`,
-              name: method.title,
+              name: cost === 0 ? 'Free Shipping' : 'Standard Shipping',
               cost: cost,
-              description: method.settings?.description?.value || '',
-              estimatedDays: getEstimatedDays(method.method_id, pincode)
+              description: cost === 0 ? 'Free shipping on orders above minimum amount' : 'Standard delivery across India',
+              estimatedDays: '5-7 days'
             });
+
+            // Only take the first enabled method to ensure single shipping option
+            break;
           }
+        }
+
+        // Break out of zone loop if we found a shipping method
+        if (shippingRates.length > 0) {
+          break;
         }
       }
     }
@@ -147,18 +155,11 @@ async function getDelhiveryShippingRates(pincode: string, cartItems: any[]): Pro
 
     const shippingRates = [
       {
-        id: 'delhivery_surface',
-        name: 'Delhivery Surface',
+        id: 'delhivery_standard',
+        name: 'Standard Shipping',
         cost: Math.max(50, totalWeight * 10),
-        description: 'Standard delivery via Delhivery',
+        description: 'Standard delivery across India',
         estimatedDays: '5-7 days'
-      },
-      {
-        id: 'delhivery_express',
-        name: 'Delhivery Express',
-        cost: Math.max(100, totalWeight * 20),
-        description: 'Express delivery via Delhivery',
-        estimatedDays: '2-3 days'
       }
     ];
 
@@ -195,13 +196,11 @@ async function getBasicShippingRates(pincode: string, cartItems: any[]): Promise
 
   const shippingRates = [];
 
-  // Standard shipping (always available)
+  // Single shipping method with automatic pricing
   const shippingName = shippingCost === 0 ? 'Free Shipping' : 'Standard Shipping';
   const description = shippingCost === 0
     ? 'Free shipping on orders above ₹2999'
-    : state.toLowerCase().includes('punjab')
-      ? 'Standard shipping to Punjab'
-      : 'Standard shipping';
+    : 'Standard delivery across India';
 
   shippingRates.push({
     id: 'standard',
