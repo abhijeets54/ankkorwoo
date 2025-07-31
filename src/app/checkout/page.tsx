@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Truck, CreditCard } from 'lucide-react';
+import LocationDetector from '@/components/checkout/LocationDetector';
+import StateCitySelector from '@/components/checkout/StateCitySelector';
+import { LocationData, getLocationFromPincode } from '@/lib/locationUtils';
 
 interface CheckoutFormData {
   firstName: string;
@@ -29,11 +32,22 @@ export default function CheckoutPage() {
   const cartStore = useLocalCartStore();
   const checkoutStore = useCheckoutStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<CheckoutFormData>();
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CheckoutFormData>({
+    mode: 'onChange'
+  });
+
+  // Register state and city fields for validation
+  useEffect(() => {
+    register('state', { required: 'State is required' });
+    register('city', { required: 'City is required' });
+  }, [register]);
 
   // Watch pincode for shipping rate fetching
   const pincode = watch('pincode');
+  const state = watch('state');
+  const city = watch('city');
 
   // Initialize cart data in checkout store
   useEffect(() => {
@@ -63,6 +77,38 @@ export default function CheckoutPage() {
       checkoutStore.fetchShippingRates(pincode);
     }
   }, [pincode, isAuthenticated]); // Removed checkoutStore from dependencies
+
+  // Auto-fill state and city when pincode is entered
+  useEffect(() => {
+    if (pincode && pincode.length === 6) {
+      const fetchLocationFromPincode = async () => {
+        try {
+          const locationData = await getLocationFromPincode(pincode);
+          if (locationData.state) {
+            setValue('state', locationData.state);
+          }
+          if (locationData.city) {
+            setValue('city', locationData.city);
+          }
+          setLocationError(null);
+        } catch (error) {
+          console.error('Error fetching location from pincode:', error);
+          // Don't show error for pincode lookup failure
+        }
+      };
+
+      fetchLocationFromPincode();
+    }
+  }, [pincode, setValue]);
+
+  const handleLocationDetected = (location: LocationData) => {
+    // Location detected but we need manual entry for now
+    setLocationError(null);
+  };
+
+  const handleLocationError = (error: string) => {
+    setLocationError(error);
+  };
 
   const onSubmit = async (data: CheckoutFormData) => {
     // Set shipping address in store
@@ -236,6 +282,12 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      {locationError && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded">
+          {locationError}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Checkout Form */}
         <div className="lg:col-span-2 space-y-6">
@@ -245,6 +297,12 @@ export default function CheckoutPage() {
               <Truck className="mr-2 h-5 w-5" />
               Shipping Address
             </h2>
+
+            <LocationDetector
+              onLocationDetected={handleLocationDetected}
+              onError={handleLocationError}
+              disabled={isSubmitting}
+            />
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -289,29 +347,14 @@ export default function CheckoutPage() {
                   <Input id="address2" {...register('address2')} />
                 </div>
 
-                <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    {...register('city', { required: 'City is required' })}
-                    className={errors.city ? 'border-red-300' : ''}
-                  />
-                  {errors.city && (
-                    <p className="text-sm text-red-500 mt-1">{errors.city.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    {...register('state', { required: 'State is required' })}
-                    className={errors.state ? 'border-red-300' : ''}
-                  />
-                  {errors.state && (
-                    <p className="text-sm text-red-500 mt-1">{errors.state.message}</p>
-                  )}
-                </div>
+                <StateCitySelector
+                  selectedState={state || ''}
+                  selectedCity={city || ''}
+                  onStateChange={(newState) => setValue('state', newState)}
+                  onCityChange={(newCity) => setValue('city', newCity)}
+                  stateError={errors.state?.message}
+                  cityError={errors.city?.message}
+                />
 
                 <div>
                   <Label htmlFor="pincode">Pincode</Label>

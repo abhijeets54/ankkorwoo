@@ -13,7 +13,14 @@
     "dev:woo": "next dev --dotenv .env.woocommerce",
     "verify-jwt": "node scripts/verify-jwt-auth.mjs",
     "fix-cart-ids": "node scripts/fix-cart-product-ids.mjs",
-    "test-store-api": "node scripts/test-store-api.js"
+    "test-store-api": "node scripts/test-store-api.js",
+    "test:inventory": "node scripts/test-inventory-system.js",
+    "test:inventory:stock": "node scripts/test-inventory-system.js stock",
+    "test:inventory:reservation": "node scripts/test-inventory-system.js reservation",
+    "test:inventory:webhooks": "node scripts/test-inventory-system.js webhooks",
+    "test:inventory:sse": "node scripts/test-inventory-system.js sse",
+    "test:inventory:cleanup": "node scripts/test-inventory-system.js cleanup",
+    "test:inventory:health": "node scripts/test-inventory-system.js health"
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",

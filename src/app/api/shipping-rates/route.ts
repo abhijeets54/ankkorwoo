@@ -170,20 +170,46 @@ async function getDelhiveryShippingRates(pincode: string, cartItems: any[]): Pro
 }
 
 async function getBasicShippingRates(pincode: string, cartItems: any[]): Promise<any[]> {
+  const { calculateShippingCost, getLocationFromPincode } = await import('@/lib/locationUtils');
+
   const totalValue = cartItems.reduce((sum: number, item: any) => {
     const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
     return sum + (price * item.quantity);
   }, 0);
 
+  let state = '';
+  let shippingCost = 99; // Default for other states
+
+  try {
+    // Get state from pincode
+    const locationData = await getLocationFromPincode(pincode);
+    state = locationData.state || '';
+
+    // Calculate shipping cost based on your rules
+    shippingCost = calculateShippingCost(state, totalValue);
+  } catch (error) {
+    console.error('Error getting location from pincode:', error);
+    // Fallback: assume non-Punjab state
+    shippingCost = totalValue > 2999 ? 0 : 99;
+  }
+
   const shippingRates = [];
 
   // Standard shipping (always available)
+  const shippingName = shippingCost === 0 ? 'Free Shipping' : 'Standard Shipping';
+  const description = shippingCost === 0
+    ? 'Free shipping on orders above ₹2999'
+    : state.toLowerCase().includes('punjab')
+      ? 'Standard shipping to Punjab'
+      : 'Standard shipping';
+
   shippingRates.push({
     id: 'standard',
-    name: 'Standard Shipping',
-    cost: totalValue > 1000 ? 0 : 50, // Free shipping over ₹1000
-    description: 'Delivered in 5-7 business days',
-    estimatedDays: '5-7 days'
+    name: shippingName,
+    cost: shippingCost,
+    description: description,
+    estimatedDays: '5-7 days',
+    state: state
   });
 
   // Express shipping (available for most pincodes)

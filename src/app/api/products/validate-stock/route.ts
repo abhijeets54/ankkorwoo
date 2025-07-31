@@ -16,7 +16,7 @@ const graphQLClient = new GraphQLClient(endpoint);
 
 // GraphQL query for multiple products stock
 const GET_PRODUCTS_STOCK = gql`
-  query GetProductsStock($ids: [ID!]!) {
+  query GetProductsStock($ids: [Int]!) {
     products(where: { include: $ids }) {
       nodes {
         id
@@ -40,12 +40,7 @@ const GET_PRODUCTS_STOCK = gql`
             }
           }
         }
-        ... on ExternalProduct {
-          stockStatus
-        }
-        ... on GroupProduct {
-          stockStatus
-        }
+
       }
     }
   }

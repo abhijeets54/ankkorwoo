@@ -1,0 +1,158 @@
+{
+  "environments": {
+    "local": {
+      "baseUrl": "http://localhost:3000",
+      "description": "Local development environment"
+    },
+    "staging": {
+      "baseUrl": "https://ankkorwoo-staging.vercel.app",
+      "description": "Staging environment"
+    },
+    "production": {
+      "baseUrl": "https://ankkorwoo.vercel.app",
+      "description": "Production environment"
+    }
+  },
+  "testData": {
+    "products": [
+      {
+        "id": "57",
+        "name": "Test Product 1",
+        "description": "Primary test product for inventory tests"
+      },
+      {
+        "id": "58",
+        "name": "Test Product 2",
+        "description": "Secondary test product for bulk operations"
+      }
+    ],
+    "users": {
+      "testUser1": "test_user_inventory_001",
+      "testUser2": "test_user_inventory_002",
+      "guestUser": "guest_user_test"
+    },
+    "reservationDuration": 900,
+    "testQuantities": [1, 2, 5, 10]
+  },
+  "endpoints": {
+    "stock": {
+      "individual": "/api/products/{productId}/stock",
+      "bulk": "/api/products/validate-stock"
+    },
+    "reservations": {
+      "base": "/api/reservations",
+      "cleanup": "/api/reservations/cleanup"
+    },
+    "webhooks": {
+      "inventory": "/api/webhooks/inventory",
+      "order": "/api/webhooks/order",
+      "test": "/api/webhooks/test"
+    },
+    "realtime": {
+      "sse": "/api/stock-updates"
+    }
+  },
+  "testScenarios": {
+    "stockValidation": {
+      "description": "Test stock validation for individual and bulk products",
+      "tests": [
+        "individual_product_stock",
+        "bulk_product_validation",
+        "invalid_product_id",
+        "variation_stock_check"
+      ]
+    },
+    "stockReservation": {
+      "description": "Test complete stock reservation lifecycle",
+      "tests": [
+        "create_reservation",
+        "check_reserved_stock",
+        "user_reservations_list",
+        "reservation_expiry",
+        "release_reservation",
+        "confirm_reservation"
+      ]
+    },
+    "webhooks": {
+      "description": "Test webhook endpoints and processing",
+      "tests": [
+        "inventory_webhook_get",
+        "inventory_webhook_post",
+        "order_webhook_get",
+        "order_webhook_post",
+        "webhook_signature_validation"
+      ]
+    },
+    "realtime": {
+      "description": "Test real-time stock updates via SSE",
+      "tests": [
+        "sse_connection",
+        "stock_update_broadcast",
+        "connection_resilience"
+      ]
+    },
+    "cleanup": {
+      "description": "Test cleanup functionality",
+      "tests": [
+        "manual_cleanup",
+        "scheduled_cleanup_auth",
+        "unauthorized_cleanup",
+        "expired_reservation_cleanup"
+      ]
+    }
+  },
+  "expectedResponses": {
+    "stockValidation": {
+      "success": {
+        "status": 200,
+        "requiredFields": ["available", "stockQuantity", "stockStatus"]
+      },
+      "notFound": {
+        "status": 404,
+        "requiredFields": ["error"]
+      }
+    },
+    "reservation": {
+      "created": {
+        "status": 200,
+        "requiredFields": ["success", "reservation"]
+      },
+      "failed": {
+        "status": 400,
+        "requiredFields": ["error"]
+      }
+    },
+    "webhook": {
+      "success": {
+        "status": 200,
+        "requiredFields": ["success", "timestamp"]
+      }
+    },
+    "cleanup": {
+      "success": {
+        "status": 200,
+        "requiredFields": ["success", "cleanedUp"]
+      },
+      "unauthorized": {
+        "status": 401,
+        "requiredFields": ["error"]
+      }
+    }
+  },
+  "performance": {
+    "timeouts": {
+      "api": 10000,
+      "sse": 5000,
+      "webhook": 15000
+    },
+    "thresholds": {
+      "responseTime": 2000,
+      "reservationCreation": 1000,
+      "stockValidation": 500
+    }
+  },
+  "security": {
+    "cleanupToken": "ankkor_cleanup_7f9d4e2a8b1c6f3e9d7a2b5c8e1f4a7b9c2d5e8f1a4b7c0d3e6f9a2b5c8e1f4a7b",
+    "webhookSecret": "c237o8t4c234yt2348t2oy342t4cb8oy"
+  }
+}

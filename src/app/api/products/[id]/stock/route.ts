@@ -39,12 +39,7 @@ const GET_PRODUCT_STOCK = gql`
           }
         }
       }
-      ... on ExternalProduct {
-        stockStatus
-      }
-      ... on GroupProduct {
-        stockStatus
-      }
+
     }
   }
 `;

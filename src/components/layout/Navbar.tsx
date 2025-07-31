@@ -146,10 +146,10 @@ const Navbar = () => {
                       <Link href="/wishlist" className="block text-[#2c2c27] hover:bg-[#f4f3f0] cursor-pointer py-2 px-4 rounded">
                         Wishlist
                       </Link>
-                      {/* Development link for testing checkout */}
+                      {/* Development link for testing checkout 
                       <Link href="/woocommerce-checkout-test" className="block text-[#2c2c27] hover:bg-[#f4f3f0] cursor-pointer py-2 px-4 rounded text-xs bg-gray-100">
                         Test WooCommerce Checkout
-                      </Link>
+                      </Link> */}
                       <div className="h-px bg-[#e5e2d9] my-2"></div>
                       <button 
                         onClick={logout}
