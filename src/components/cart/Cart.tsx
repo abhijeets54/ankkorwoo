@@ -36,7 +36,7 @@ const Cart: React.FC = () => {
   const router = useRouter();
 
   // Get authentication state
-  const { isAuthenticated, user, token } = useAuth();
+  const { isAuthenticated, user, token, isLoading: authLoading } = useAuth();
 
   // Get cart data from the store
   const cart = useLocalCartStore();
@@ -217,15 +217,11 @@ const Cart: React.FC = () => {
         throw new Error('Your cart is empty');
       }
 
-      // Check if user is authenticated
-      if (!isAuthenticated) {
-        throw new Error('Please log in to continue with checkout');
-      }
-
       // Close the cart drawer first
       toggleCart();
 
       // Redirect to our custom checkout page
+      // The middleware will handle authentication and redirect to sign-in if needed
       router.push('/checkout');
 
     } catch (error) {

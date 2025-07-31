@@ -49,12 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       });
 
+      console.log('Auth initialization response:', response.status, response.ok);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Auth initialization data:', data);
         if (data.success && data.user) {
           setUser(data.user);
           setToken(data.token || 'authenticated'); // Fallback for cookie-based auth
+          console.log('User authenticated:', data.user.email);
+        } else {
+          console.log('Auth initialization failed:', data.message);
         }
+      } else {
+        console.log('Auth initialization response not ok:', response.status);
       }
     } catch (error) {
       console.error('Failed to initialize auth:', error);

@@ -72,18 +72,36 @@ export async function middleware(request: NextRequest) {
   
   // Get auth token from cookies
   const authToken = request.cookies.get('woo_auth_token')?.value;
-  
+
+  // Debug logging for protected routes
+  if (isProtectedRoute) {
+    console.log('Middleware: Protected route accessed:', request.nextUrl.pathname);
+    console.log('Middleware: Auth token present:', !!authToken);
+    console.log('Middleware: All cookies:', request.cookies.getAll().map(c => c.name));
+    if (authToken) {
+      console.log('Middleware: Token length:', authToken.length);
+      console.log('Middleware: Token starts with:', authToken.substring(0, 20) + '...');
+    }
+  }
+
   // Check if user is authenticated
   let isAuthenticated = false;
-  
+
   if (authToken) {
     try {
       // Verify token expiration
       const decoded = jwtDecode<JwtPayload>(authToken);
       const currentTime = Date.now() / 1000;
-      
+
       if (decoded.exp > currentTime) {
         isAuthenticated = true;
+        if (isProtectedRoute) {
+          console.log('Middleware: User authenticated, token valid');
+        }
+      } else {
+        if (isProtectedRoute) {
+          console.log('Middleware: Token expired');
+        }
       }
     } catch (e) {
       console.error('Error decoding token in middleware:', e);

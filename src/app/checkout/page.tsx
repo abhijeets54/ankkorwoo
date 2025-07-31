@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { useLocalCartStore } from '@/lib/localCartStore';
@@ -46,6 +46,15 @@ export default function CheckoutPage() {
   const pincode = watch('pincode');
   const state = watch('state');
   const city = watch('city');
+
+  // Memoized handlers to prevent infinite re-renders
+  const handleStateChange = useCallback((newState: string) => {
+    setValue('state', newState);
+  }, [setValue]);
+
+  const handleCityChange = useCallback((newCity: string) => {
+    setValue('city', newCity);
+  }, [setValue]);
 
   // Initialize cart data in checkout store
   useEffect(() => {
@@ -337,8 +346,8 @@ export default function CheckoutPage() {
                 <StateCitySelector
                   selectedState={state || ''}
                   selectedCity={city || ''}
-                  onStateChange={(newState) => setValue('state', newState)}
-                  onCityChange={(newCity) => setValue('city', newCity)}
+                  onStateChange={handleStateChange}
+                  onCityChange={handleCityChange}
                   stateError={errors.state?.message}
                   cityError={errors.city?.message}
                 />

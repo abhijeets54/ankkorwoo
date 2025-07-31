@@ -29,7 +29,7 @@ export default function StateCitySelector({
     if (selectedState) {
       const stateCities = getCitiesForState(selectedState);
       setCities(stateCities);
-      
+
       // Clear city selection if current city is not in new state
       if (selectedCity && !stateCities.includes(selectedCity)) {
         onCityChange('');
@@ -38,7 +38,17 @@ export default function StateCitySelector({
       setCities([]);
       onCityChange('');
     }
-  }, [selectedState, selectedCity, onCityChange]);
+  }, [selectedState]); // Removed selectedCity and onCityChange from dependencies
+
+  // Separate effect to handle city validation when selectedCity changes
+  useEffect(() => {
+    if (selectedState && selectedCity && cities.length > 0) {
+      // Clear city selection if current city is not in the current state's cities
+      if (!cities.includes(selectedCity)) {
+        onCityChange('');
+      }
+    }
+  }, [selectedCity, cities]); // Only depend on selectedCity and cities array
 
   return (
     <>
