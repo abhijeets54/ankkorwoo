@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
     let shippingRates = [];
 
     if (shippingProvider === 'woocommerce') {
-      shippingRates = await getWooCommerceShippingRates(pincode, cartItems);
+      shippingRates = await getWooCommerceShippingRates(pincode, cartItems, state);
     } else if (shippingProvider === 'delhivery') {
-      shippingRates = await getDelhiveryShippingRates(pincode, cartItems);
+      shippingRates = await getDelhiveryShippingRates(pincode, cartItems, state);
     } else {
       // Fallback to basic calculation
       shippingRates = await getBasicShippingRates(pincode, cartItems, state);
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function getWooCommerceShippingRates(pincode: string, cartItems: any[]): Promise<any[]> {
+async function getWooCommerceShippingRates(pincode: string, cartItems: any[], state?: string): Promise<any[]> {
   try {
     const wooUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL;
     const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
@@ -141,11 +141,11 @@ async function getWooCommerceShippingRates(pincode: string, cartItems: any[]): P
   } catch (error) {
     console.error('WooCommerce shipping error:', error);
     // Fallback to basic rates
-    return getBasicShippingRates(pincode, cartItems);
+    return getBasicShippingRates(pincode, cartItems, state);
   }
 }
 
-async function getDelhiveryShippingRates(pincode: string, cartItems: any[]): Promise<any[]> {
+async function getDelhiveryShippingRates(pincode: string, cartItems: any[], state?: string): Promise<any[]> {
   try {
     // This would integrate with Delhivery API
     // For now, return basic rates with Delhivery-like options
