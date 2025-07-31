@@ -42,10 +42,14 @@ export default function CheckoutPage() {
     register('city', { required: 'City is required' });
   }, [register]);
 
-  // Watch pincode for shipping rate fetching
+  // Watch form fields for shipping rate fetching
   const pincode = watch('pincode');
   const state = watch('state');
   const city = watch('city');
+  const firstName = watch('firstName');
+  const lastName = watch('lastName');
+  const address1 = watch('address1');
+  const phone = watch('phone');
 
   // Initialize cart data in checkout store
   useEffect(() => {
@@ -74,13 +78,12 @@ export default function CheckoutPage() {
     if (pincode && pincode.length === 6 && state && isAuthenticated && isAddressComplete()) {
       checkoutStore.fetchShippingRates(pincode, state);
     }
-  }, [pincode, state, isAuthenticated, watch()]); // Watch all form fields
+  }, [pincode, state, firstName, lastName, address1, city, phone, isAuthenticated]); // Watch individual form fields
 
   // Check if all required address fields are filled
   const isAddressComplete = () => {
-    const formData = watch();
-    return formData.firstName && formData.lastName && formData.address1 &&
-           formData.city && formData.state && formData.pincode && formData.phone;
+    return firstName && lastName && address1 &&
+           city && state && pincode && phone;
   };
 
   // Auto-fill state and city when pincode is entered
@@ -164,7 +167,7 @@ export default function CheckoutPage() {
       console.log('Creating Razorpay order for amount:', checkoutStore.finalAmount);
       const razorpayOrder = await createRazorpayOrder(
         checkoutStore.finalAmount,
-        `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        `order_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
         {
           customer_phone: checkoutStore.shippingAddress.phone,
           customer_name: `${checkoutStore.shippingAddress.firstName} ${checkoutStore.shippingAddress.lastName}`,
@@ -175,7 +178,7 @@ export default function CheckoutPage() {
       console.log('Razorpay order created:', razorpayOrder.id);
 
       // Initialize Razorpay checkout
-      const paymentResponse = await initializeRazorpayCheckout({
+      await initializeRazorpayCheckout({
         key: razorpayKeyId,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
