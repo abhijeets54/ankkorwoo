@@ -69,12 +69,13 @@ export default function CheckoutPage() {
     loadRazorpayScript();
   }, []);
 
-  // Fetch shipping rates when state changes (regardless of other fields)
+  // Fetch shipping rates when state or cart changes
   useEffect(() => {
-    if (state && isAuthenticated) {
+    if (state && isAuthenticated && checkoutStore.cart.length > 0) {
+
       checkoutStore.fetchShippingRates(pincode || '000000', state);
     }
-  }, [state, isAuthenticated]); // Only watch state and auth status
+  }, [state, isAuthenticated, checkoutStore.subtotal, checkoutStore.cart.length]); // Watch state, auth, and cart changes
 
 
 
@@ -394,6 +395,11 @@ export default function CheckoutPage() {
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-700">
                 🚚 Free shipping on orders above ₹2999
+                {checkoutStore.subtotal > 0 && checkoutStore.subtotal <= 2999 && (
+                  <span className="ml-2 text-green-600">
+                    (Add ₹{(2999 - checkoutStore.subtotal + 1).toFixed(0)} more for free shipping)
+                  </span>
+                )}
               </p>
             </div>
 
@@ -502,14 +508,21 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span>
+                  <span className="flex items-center gap-1">
                     {!state
                       ? 'Select state'
-                      : checkoutStore.selectedShipping
-                        ? checkoutStore.selectedShipping.cost === 0
-                          ? 'Free'
-                          : `₹${checkoutStore.selectedShipping.cost.toFixed(2)}`
-                        : 'Calculating...'
+                      : checkoutStore.isLoadingShipping
+                        ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span className="text-sm">Updating...</span>
+                          </>
+                        )
+                        : checkoutStore.selectedShipping
+                          ? checkoutStore.selectedShipping.cost === 0
+                            ? 'Free'
+                            : `₹${checkoutStore.selectedShipping.cost.toFixed(2)}`
+                          : 'Calculating...'
                     }
                   </span>
                 </div>

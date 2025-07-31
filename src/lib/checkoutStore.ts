@@ -100,6 +100,9 @@ export const useCheckoutStore = create<CheckoutState>()(
         const finalAmount = subtotal + shippingCost;
 
         set({ cart, subtotal, finalAmount });
+
+        // Note: Shipping recalculation will be triggered by the useEffect in checkout page
+        // when it detects the subtotal change
       },
 
       setShippingAddress: (address) => {
