@@ -9,18 +9,25 @@ import { useEventListener } from '@/lib/eventBus';
 // Toast types
 export type ToastType = 'success' | 'error' | 'info';
 
+// Toast action interface
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 // Toast interface
 export interface Toast {
   id: string;
   message: string;
   type: ToastType;
   duration?: number;
+  action?: ToastAction;
 }
 
 // Toast context interface
 interface ToastContextType {
   toasts: Toast[];
-  addToast: (message: string, type: ToastType, duration?: number) => void;
+  addToast: (message: string, type: ToastType, duration?: number, action?: ToastAction) => void;
   removeToast: (id: string) => void;
 }
 
@@ -31,9 +38,9 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (message: string, type: ToastType = 'info', duration = 3000) => {
+  const addToast = (message: string, type: ToastType = 'info', duration = 3000, action?: ToastAction) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    setToasts((prev) => [...prev, { id, message, type, duration, action }]);
   };
 
   const removeToast = (id: string) => {
@@ -41,8 +48,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Listen to notification events from the event bus
-  useEventListener('notification:show', ({ message, type, duration }) => {
-    addToast(message, type, duration);
+  useEventListener('notification:show', ({ message, type, duration, action }) => {
+    addToast(message, type, duration, action);
   });
 
   useEventListener('notification:hide', ({ id }) => {
@@ -111,7 +118,20 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
       className={`flex items-center p-4 rounded-lg border shadow-lg ${getBgColor()} max-w-md`}
     >
       <Icon />
-      <span className="ml-3 text-sm font-medium flex-1">{toast.message}</span>
+      <div className="ml-3 flex-1">
+        <span className="text-sm font-medium">{toast.message}</span>
+        {toast.action && (
+          <button
+            onClick={() => {
+              toast.action!.onClick();
+              onRemove();
+            }}
+            className="mt-2 block text-xs font-medium text-[#2c2c27] hover:text-[#3d3d35] underline"
+          >
+            {toast.action.label}
+          </button>
+        )}
+      </div>
       <button
         onClick={onRemove}
         className="ml-4 text-gray-400 hover:text-gray-600"
@@ -127,7 +147,7 @@ function ToastContainer() {
   const { toasts, removeToast } = useToast();
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed top-4 right-4 z-[10000] space-y-2">
       <AnimatePresence>
         {toasts.map((toast) => (
           <ToastItem

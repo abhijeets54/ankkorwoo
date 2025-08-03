@@ -218,11 +218,34 @@ const Cart: React.FC = () => {
         throw new Error('Your cart is empty');
       }
 
+      // Check if user is authenticated before proceeding to checkout
+      if (!isAuthenticated || !user) {
+        setCheckoutLoading(false);
+
+        // Close the cart drawer first
+        toggleCart();
+
+        // Show beautiful toast notification with sign-in action
+        notificationEvents.show(
+          'Please sign in to proceed with checkout and place your order.',
+          'info',
+          5000, // Show for 5 seconds
+          {
+            label: 'Sign In',
+            onClick: () => {
+              router.push('/sign-in?redirect=/checkout');
+            }
+          }
+        );
+
+        return;
+      }
+
       // Close the cart drawer first
       toggleCart();
 
       // Redirect to our custom checkout page
-      // The middleware will handle authentication and redirect to sign-in if needed
+      // User is authenticated, so proceed to checkout
       router.push('/checkout');
 
       // Reset loading state after a short delay to account for navigation

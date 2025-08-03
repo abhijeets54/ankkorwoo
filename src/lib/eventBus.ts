@@ -28,7 +28,7 @@ export interface CartEvents {
 }
 
 export interface NotificationEvents {
-  'notification:show': { message: string; type: 'success' | 'error' | 'info'; duration?: number };
+  'notification:show': { message: string; type: 'success' | 'error' | 'info'; duration?: number; action?: { label: string; onClick: () => void } };
   'notification:hide': { id: string };
 }
 
@@ -181,10 +181,10 @@ export const cartEvents = {
 };
 
 export const notificationEvents = {
-  show: (message: string, type: 'success' | 'error' | 'info' = 'info', duration?: number) => 
-    eventBus.emit('notification:show', { message, type, duration }),
-  
-  hide: (id: string) => 
+  show: (message: string, type: 'success' | 'error' | 'info' = 'info', duration?: number, action?: { label: string; onClick: () => void }) =>
+    eventBus.emit('notification:show', { message, type, duration, action }),
+
+  hide: (id: string) =>
     eventBus.emit('notification:hide', { id }),
 };
 
