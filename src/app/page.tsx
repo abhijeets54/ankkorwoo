@@ -31,7 +31,7 @@ export default function Home() {
         
         if (!products || products.length === 0) {
           console.warn('No products returned from WooCommerce');
-          setError('No products found. Please check your WooCommerce store configuration.');
+          setError('We\'re experiencing technical difficulties. Please try again later.');
           setIsLoading(false);
           return;
         }
@@ -68,7 +68,7 @@ export default function Home() {
         setIsLoading(false);
       } catch (err) {
         console.error('Error fetching products:', err);
-        setError('Failed to load products from WooCommerce');
+        setError('We\'re experiencing technical difficulties. Please try again later.');
         setIsLoading(false);
       }
     };
@@ -103,52 +103,6 @@ export default function Home() {
     animate: { opacity: 1, scale: 1, transition: { duration: 0.9, ease: "easeOut" } }
   };
 
-  // Fallback products in case WooCommerce API fails
-  const fallbackProducts = [
-    {
-      id: 'prod_1',
-      title: 'Oxford Dress Shirt',
-      price: '4999.00',
-      images: [{ url: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?q=80' }],
-      handle: 'oxford-dress-shirt',
-      metafields: { custom_material: 'Egyptian Cotton' },
-      isNew: true,
-      variants: [{ id: 'var_1' }]
-    },
-    {
-      id: 'prod_2',
-      title: 'Italian Slim Chinos',
-      price: '5999.00',
-      images: [{ url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80' }],
-      handle: 'italian-slim-chinos',
-      metafields: { custom_material: 'Cotton Twill' },
-      isNew: true,
-      variants: [{ id: 'var_2' }]
-    },
-    {
-      id: 'prod_3',
-      title: 'Premium Linen Shirt',
-      price: '4499.00',
-      images: [{ url: 'https://images.unsplash.com/photo-1604695573706-53170668f6a6?q=80' }],
-      handle: 'premium-linen-shirt',
-      metafields: { custom_material: 'Irish Linen' },
-      isNew: true,
-      variants: [{ id: 'var_3' }]
-    },
-    {
-      id: 'prod_4',
-      title: 'Tailored Wool Pants',
-      price: '6499.00',
-      images: [{ url: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80' }],
-      handle: 'tailored-wool-pants',
-      metafields: { custom_material: 'Italian Wool' },
-      isNew: true,
-      variants: [{ id: 'var_4' }]
-    }
-  ];
-
-  // Use real products if available, otherwise use fallback
-  const displayProducts = featuredProducts.length > 0 ? featuredProducts : fallbackProducts;
 
   return (
     <div className="min-h-screen bg-[#f8f8f5]">
@@ -229,39 +183,67 @@ export default function Home() {
             </p>
           </div>
           
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 p-4 mb-8 rounded">
-              <p>{error}</p>
-              <p className="text-sm mt-2">Please check your WooCommerce configuration in the .env.local file.</p>
+          {isLoading && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <Skeleton className="w-full h-80 mb-4" />
+                  <Skeleton className="w-3/4 h-4 mb-2" />
+                  <Skeleton className="w-1/2 h-4" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && !isLoading && (
+            <div className="text-center py-16">
+              <div className="max-w-md mx-auto">
+                <h3 className="text-xl font-serif text-[#2c2c27] mb-4">Service Temporarily Unavailable</h3>
+                <p className="text-[#5c5c52] mb-6">{error}</p>
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="bg-[#2c2c27] text-white px-6 py-2 hover:bg-[#3d3d35] transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           )}
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {displayProducts.map((product) => {
-              const originalProduct = product._originalWooProduct;
-              return (
-                <ProductCard
-                  key={product.id}
-                  id={product.id}
-                  name={product.title}
-                  price={originalProduct?.salePrice || originalProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
-                  image={product.images[0]?.url || ''}
-                  slug={product.handle}
-                  material={getMetafield(product, 'custom_material', undefined, product.vendor || 'Premium Fabric')}
-                  isNew={true}
-                  stockStatus={originalProduct?.stockStatus || "IN_STOCK"}
-                  compareAtPrice={product.compareAtPrice}
-                  regularPrice={originalProduct?.regularPrice}
-                  salePrice={originalProduct?.salePrice}
-                  onSale={originalProduct?.onSale || false}
-                  currencySymbol={getCurrencySymbol(product.currencyCode)}
-                  currencyCode={product.currencyCode || 'INR'}
-                  shortDescription={originalProduct?.shortDescription}
-                  type={originalProduct?.type}
-                />
-              );
-            })}
-          </div>
+          {!isLoading && !error && featuredProducts.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {featuredProducts.map((product) => {
+                const originalProduct = product._originalWooProduct;
+                return (
+                  <ProductCard
+                    key={product.id}
+                    id={product.id}
+                    name={product.title}
+                    price={originalProduct?.salePrice || originalProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
+                    image={product.images[0]?.url || ''}
+                    slug={product.handle}
+                    material={getMetafield(product, 'custom_material', undefined, product.vendor || 'Premium Fabric')}
+                    isNew={true}
+                    stockStatus={originalProduct?.stockStatus || "IN_STOCK"}
+                    compareAtPrice={product.compareAtPrice}
+                    regularPrice={originalProduct?.regularPrice}
+                    salePrice={originalProduct?.salePrice}
+                    onSale={originalProduct?.onSale || false}
+                    currencySymbol={getCurrencySymbol(product.currencyCode)}
+                    currencyCode={product.currencyCode || 'INR'}
+                    shortDescription={originalProduct?.shortDescription}
+                    type={originalProduct?.type}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {!isLoading && !error && featuredProducts.length === 0 && (
+            <div className="text-center py-16">
+              <p className="text-[#5c5c52]">No products available at the moment.</p>
+            </div>
+          )}
           
           <div className="text-center mt-12">
             <Link 

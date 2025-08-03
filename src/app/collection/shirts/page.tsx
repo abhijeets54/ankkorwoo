@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import ProductCard from '@/components/product/ProductCard';
 import Link from 'next/link';
 import ImageLoader from '@/components/ui/ImageLoader';
+import { Skeleton } from '@/components/ui/skeleton';
 import usePageLoading from '@/hooks/usePageLoading';
 import { getCategoryProducts, normalizeProduct, getMetafield } from '@/lib/woocommerce';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
@@ -229,7 +230,7 @@ export default function ShirtsCollectionPage() {
 
         if (!categoryData || !categoryData.products?.nodes || categoryData.products.nodes.length === 0) {
           console.log('❌ No shirt products found in any category');
-          setError(`No shirt products found using method: ${fetchMethod}. Available categories: ${allCategories?.map((cat: any) => cat.name).join(', ') || 'None found'}. Please check your WooCommerce shirts category setup.`);
+          setError('We\'re experiencing technical difficulties. Please try again later.');
           setIsLoading(false);
           return;
         }
@@ -270,7 +271,7 @@ export default function ShirtsCollectionPage() {
 
       } catch (err) {
         console.error("💥 Critical error fetching products:", err);
-        setError(`Failed to load products from WooCommerce: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        setError('We\'re experiencing technical difficulties. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -337,29 +338,31 @@ export default function ShirtsCollectionPage() {
       {/* Filters and Products */}
       <div className="container mx-auto px-4">
         {/* Error message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-4 mb-8 rounded">
-            <p className="font-semibold">Error loading shirts:</p>
-            <p>{error}</p>
-            <p className="text-sm mt-2">Please check your WooCommerce configuration and ensure you have products in the 'shirts' category.</p>
-            
-            {/* Debug information */}
-            {debugInfo && (
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-semibold">Debug Information</summary>
-                <pre className="text-xs mt-2 bg-gray-100 p-2 rounded overflow-auto max-h-40">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </details>
-            )}
+        {error && !isLoading && (
+          <div className="text-center py-16">
+            <div className="max-w-md mx-auto">
+              <h3 className="text-xl font-serif text-[#2c2c27] mb-4">Service Temporarily Unavailable</h3>
+              <p className="text-[#5c5c52] mb-6">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="bg-[#2c2c27] text-white px-6 py-2 hover:bg-[#3d3d35] transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           </div>
         )}
 
         {/* Loading state */}
         {isLoading && (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2c2c27]"></div>
-            <p className="mt-4 text-[#5c5c52]">Loading shirts...</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {Array.from({ length: 9 }).map((_, index) => (
+              <div key={index} className="animate-pulse">
+                <Skeleton className="w-full h-80 mb-4" />
+                <Skeleton className="w-3/4 h-4 mb-2" />
+                <Skeleton className="w-1/2 h-4" />
+              </div>
+            ))}
           </div>
         )}
         
@@ -382,7 +385,7 @@ export default function ShirtsCollectionPage() {
               </div>
             </div>
             
-            {!isLoading && sortedProducts.length > 0 && (
+            {!isLoading && !error && sortedProducts.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                 {sortedProducts.map(product => {
                   // Extract and validate the variant ID for the product
@@ -471,9 +474,9 @@ export default function ShirtsCollectionPage() {
               </div>
             )}
             
-            {!isLoading && sortedProducts.length === 0 && !error && (
+            {!isLoading && !error && sortedProducts.length === 0 && (
               <div className="text-center py-16">
-                <p className="text-[#5c5c52] mb-4">No products found.</p>
+                <p className="text-[#5c5c52]">No shirts available at the moment.</p>
               </div>
             )}
         </div>

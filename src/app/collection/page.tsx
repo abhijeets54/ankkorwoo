@@ -8,6 +8,7 @@ import ProductCard from '@/components/product/ProductCard';
 import { getAllProducts, normalizeProduct, getMetafield } from '@/lib/woocommerce';
 import usePageLoading from '@/hooks/usePageLoading';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Define product type
 interface ProductImage {
@@ -83,7 +84,7 @@ export default function CollectionPage() {
         const allProducts = await getAllProducts(100); // Fetch up to 100 products
         
         if (!allProducts || allProducts.length === 0) {
-          setError('No products found. Please check your WooCommerce store configuration.');
+          setError('We\'re experiencing technical difficulties. Please try again later.');
           setIsLoading(false);
           return;
         }
@@ -104,7 +105,7 @@ export default function CollectionPage() {
         console.log(`Successfully fetched ${transformedProducts.length} products from WooCommerce`);
       } catch (err) {
         console.error("Error fetching products:", err);
-        setError('Failed to load products from WooCommerce');
+        setError('We\'re experiencing technical difficulties. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -216,10 +217,18 @@ export default function CollectionPage() {
       {/* Filters and Products */}
       <div className="container mx-auto px-4">
         {/* Error message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-4 mb-8 rounded">
-            <p>{error}</p>
-            <p className="text-sm mt-2">Please check your WooCommerce configuration in the .env.local file.</p>
+        {error && !isLoading && (
+          <div className="text-center py-16">
+            <div className="max-w-md mx-auto">
+              <h3 className="text-xl font-serif text-[#2c2c27] mb-4">Service Temporarily Unavailable</h3>
+              <p className="text-[#5c5c52] mb-6">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="bg-[#2c2c27] text-white px-6 py-2 hover:bg-[#3d3d35] transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           </div>
         )}
         
@@ -356,8 +365,23 @@ export default function CollectionPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {sortedProducts.map(product => {
+            {/* Loading state */}
+            {isLoading && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {Array.from({ length: 9 }).map((_, index) => (
+                  <div key={index} className="animate-pulse">
+                    <Skeleton className="w-full h-80 mb-4" />
+                    <Skeleton className="w-3/4 h-4 mb-2" />
+                    <Skeleton className="w-1/2 h-4" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Products grid */}
+            {!isLoading && !error && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {sortedProducts.map(product => {
                 // Extract and validate the variant ID for the product
                 let variantId = '';
                 
@@ -426,7 +450,15 @@ export default function CollectionPage() {
                   return null; // Skip rendering this product if there's an error
                 }
               })}
-            </div>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!isLoading && !error && sortedProducts.length === 0 && (
+              <div className="text-center py-16">
+                <p className="text-[#5c5c52]">No products available at the moment.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
