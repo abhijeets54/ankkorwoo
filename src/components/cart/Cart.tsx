@@ -38,6 +38,7 @@ const Cart: React.FC = () => {
   // Get authentication state
   const { isAuthenticated, user, token, isLoading: authLoading } = useAuth();
 
+
   // Get cart data from the store
   const cart = useLocalCartStore();
   const {
@@ -224,6 +225,11 @@ const Cart: React.FC = () => {
       // The middleware will handle authentication and redirect to sign-in if needed
       router.push('/checkout');
 
+      // Reset loading state after a short delay to account for navigation
+      setTimeout(() => {
+        setCheckoutLoading(false);
+      }, 1000);
+
     } catch (error) {
       console.error('Checkout error:', error);
       setCheckoutError(error instanceof Error ? error.message : 'An error occurred during checkout');
@@ -270,8 +276,13 @@ const Cart: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={toggleCart}
-            className="fixed inset-0 bg-black/50 z-40"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Cart backdrop clicked');
+              toggleCart();
+            }}
+            className="cart-overlay fixed inset-0 bg-black/50"
             aria-hidden="true"
           />
         )}
@@ -285,7 +296,7 @@ const Cart: React.FC = () => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-white z-50 shadow-xl flex flex-col"
+            className="cart-sidebar fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col"
           >
             {/* Cart Header */}
             <div className="flex items-center justify-between p-4 border-b">
@@ -294,9 +305,15 @@ const Cart: React.FC = () => {
                 Your Cart
               </h2>
               <button
-                onClick={toggleCart}
-                className="p-2 hover:bg-gray-100 rounded-full"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Cart close button clicked');
+                  toggleCart();
+                }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors z-10 relative"
                 aria-label="Close cart"
+                type="button"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -369,12 +386,24 @@ const Cart: React.FC = () => {
               
               {/* Checkout Button */}
               <div className="mb-4">
-                <AnimatedCheckoutButton 
+                <Button 
                   onClick={handleCheckout}
-                  isDisabled={!hasItems || quantityUpdateInProgress} 
-                  text="Proceed to Checkout"
-                  loadingText="Preparing Checkout..."
-                />
+                  disabled={!hasItems || quantityUpdateInProgress || checkoutLoading}
+                  className="w-full h-12 bg-[#2c2c27] text-[#f4f3f0] hover:bg-[#3d3d35] font-medium transition-colors"
+                  size="lg"
+                >
+                  {checkoutLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#f4f3f0] border-t-transparent mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="h-4 w-4 mr-2" />
+                      Proceed to Checkout
+                    </>
+                  )}
+                </Button>
               </div>
               
               {/* Error Message */}
@@ -420,13 +449,16 @@ const Cart: React.FC = () => {
             </div>
 
             {/* Clear Cart Button */}
-            <button
+            <Button
               onClick={handleClearCart}
-              className="w-full text-center text-gray-500 text-sm mt-2 hover:text-gray-700"
-              disabled={checkoutLoading || quantityUpdateInProgress}
+              variant="ghost"
+              size="sm"
+              disabled={checkoutLoading || quantityUpdateInProgress || !hasItems}
+              className="w-full text-center text-[#8a8778] hover:text-[#2c2c27] hover:bg-[#f4f3f0] mt-2 transition-colors"
             >
+              <Trash2 className="h-3 w-3 mr-1" />
               Clear Cart
-            </button>
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

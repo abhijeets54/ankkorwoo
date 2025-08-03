@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart/CartProvider';
-import { Minus, Plus, ShoppingBag, Wifi, WifiOff } from 'lucide-react';
+import { Minus, Plus, ShoppingBag } from 'lucide-react';
 import { useProductStockUpdates } from '@/hooks/useStockUpdates';
 
 interface ProductDetailProps {
@@ -258,19 +258,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
               <span className={isOutOfStock ? 'text-red-600' : 'text-green-600'}>
                 {isOutOfStock ? 'Out of Stock' : 'In Stock'}
               </span>
-              {/* Real-time connection indicator */}
-              {isConnected && (
-                <div className="flex items-center gap-1 text-xs text-green-600">
-                  <Wifi className="h-3 w-3" />
-                  <span>Live</span>
-                </div>
-              )}
-              {!isConnected && stockData.lastUpdated && (
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <WifiOff className="h-3 w-3" />
-                  <span>Offline</span>
-                </div>
-              )}
             </div>
             {/* Show stock quantity if available */}
             {currentStockQuantity !== undefined && currentStockQuantity !== null && (

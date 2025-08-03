@@ -42,6 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const initializeAuth = async () => {
+    // Skip auth initialization during build/SSR
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Check if user is already authenticated
@@ -61,6 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           console.log('Auth initialization failed:', data.message);
         }
+      } else if (response.status === 401) {
+        // Token might be expired - try to refresh
+        console.log('Auth initialization failed with 401, attempting token refresh');
+        await refreshSession();
       } else {
         console.log('Auth initialization response not ok:', response.status);
       }
@@ -191,7 +201,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshSession = async () => {
+    // Skip refresh during build/SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     try {
+      // First try to refresh the token if it's expired
+      const refreshResponse = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'refresh',
+        }),
+        credentials: 'include',
+      });
+
+      // If refresh was successful, try to get user data
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        if (refreshData.success) {
+          console.log('Token refreshed successfully in AuthContext');
+        }
+      }
+
+      // Now try to get the current user (whether refresh worked or not)
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
       });
@@ -201,16 +237,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (data.success && data.user) {
           setUser(data.user);
           setToken(data.token || 'authenticated');
-        } else {
-          // Session invalid, clear state
-          setUser(null);
-          setToken(null);
+          console.log('Session refreshed successfully for user:', data.user.email);
+          return;
         }
-      } else {
-        // Session invalid, clear state
-        setUser(null);
-        setToken(null);
       }
+
+      // If we get here, session is invalid
+      console.log('Session refresh failed, clearing state');
+      setUser(null);
+      setToken(null);
     } catch (error) {
       console.error('Failed to refresh session:', error);
       setUser(null);

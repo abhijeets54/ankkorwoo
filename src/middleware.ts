@@ -99,8 +99,20 @@ export async function middleware(request: NextRequest) {
           console.log('Middleware: User authenticated, token valid');
         }
       } else {
-        if (isProtectedRoute) {
-          console.log('Middleware: Token expired');
+        // Token is expired - check if we have a refresh token
+        const refreshToken = request.cookies.get('woo_refresh_token')?.value;
+        
+        if (refreshToken) {
+          if (isProtectedRoute) {
+            console.log('Middleware: Token expired, but refresh token available - allowing pass-through for client-side refresh');
+          }
+          // Allow the request to continue - the client-side auth context will handle the refresh
+          // This prevents redirect loops while still allowing authentication to work
+          isAuthenticated = true;
+        } else {
+          if (isProtectedRoute) {
+            console.log('Middleware: Token expired and no refresh token available');
+          }
         }
       }
     } catch (e) {

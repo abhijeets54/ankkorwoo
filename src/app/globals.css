@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -48,6 +50,27 @@
   
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-playfair);
+  }
+}
+
+/* Cart specific overrides to ensure proper z-index layering */
+@layer components {
+  .cart-overlay {
+    z-index: 9998 !important;
+  }
+  
+  .cart-sidebar {
+    z-index: 9999 !important;
+  }
+  
+  /* Ensure no other elements can appear above cart */
+  .navbar, .header, .modal, .dropdown, .tooltip, .popover {
+    z-index: 999 !important;
+  }
+  
+  /* Ensure signup buttons and similar elements don't interfere */
+  .signup-button, .modal-overlay, .dropdown-menu {
+    z-index: 998 !important;
   }
 }
 

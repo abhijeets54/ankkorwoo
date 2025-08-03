@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 
 interface StockUpdate {
   type: 'connected' | 'stock_update' | 'heartbeat';
@@ -26,20 +26,45 @@ export function useStockUpdates({
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<StockUpdate | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Memoize productIds to prevent unnecessary re-renders
+  const memoizedProductIds = useMemo(() => productIds, [productIds.join(',')]);
+  
+  // Stable callback reference
+  const stableOnStockUpdate = useCallback((update: StockUpdate) => {
+    onStockUpdate?.(update);
+  }, [onStockUpdate]);
 
   const connect = useCallback(() => {
-    if (!enabled || productIds.length === 0) {
-      return;
+    // Clear any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // Clear any pending reconnection
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    if (!enabled || memoizedProductIds.length === 0) {
+      console.log('Stock updates disabled or no products specified');
+      return null;
     }
 
     const params = new URLSearchParams({
-      products: productIds.join(',')
+      products: memoizedProductIds.join(',')
     });
 
+    console.log('Creating new stock updates connection for products:', memoizedProductIds);
     const eventSource = new EventSource(`/api/stock-updates?${params}`);
+    eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('Stock updates stream connected');
+      console.log('Stock updates stream connected for products:', memoizedProductIds);
       setIsConnected(true);
       setError(null);
     };
@@ -51,7 +76,7 @@ export function useStockUpdates({
 
         if (update.type === 'stock_update') {
           console.log('Stock update received:', update);
-          onStockUpdate?.(update);
+          stableOnStockUpdate(update);
         }
       } catch (parseError) {
         console.error('Error parsing stock update:', parseError);
@@ -63,24 +88,35 @@ export function useStockUpdates({
       setIsConnected(false);
       setError('Connection to stock updates failed');
       
-      // Attempt to reconnect after 5 seconds
-      setTimeout(() => {
-        if (eventSource.readyState === EventSource.CLOSED) {
-          connect();
-        }
-      }, 5000);
+      // Only attempt to reconnect if this is still the current connection
+      if (eventSourceRef.current === eventSource) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (eventSourceRef.current === eventSource && eventSource.readyState === EventSource.CLOSED) {
+            console.log('Attempting to reconnect stock updates...');
+            connect();
+          }
+        }, 5000);
+      }
     };
 
     return eventSource;
-  }, [productIds, onStockUpdate, enabled]);
+  }, [memoizedProductIds, stableOnStockUpdate, enabled]);
 
   useEffect(() => {
-    const eventSource = connect();
+    connect();
 
     return () => {
-      if (eventSource) {
-        eventSource.close();
+      // Cleanup function
+      if (eventSourceRef.current) {
+        console.log('Cleaning up stock updates connection');
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
         setIsConnected(false);
+      }
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
     };
   }, [connect]);
@@ -102,21 +138,29 @@ export function useProductStockUpdates(productId: string, enabled = true) {
     lastUpdated?: string;
   }>({});
 
+  // Memoize the productIds array to prevent recreation
+  const memoizedProductIds = useMemo(() => 
+    productId ? [productId] : [], 
+    [productId]
+  );
+
+  // Stable callback that doesn't change unless productId changes
   const handleStockUpdate = useCallback((update: StockUpdate) => {
     if (update.productId === productId) {
-      setStockData({
+      setStockData(prevData => ({
+        ...prevData,
         stockStatus: update.stockStatus,
         stockQuantity: update.stockQuantity,
         availableForSale: update.availableForSale,
         lastUpdated: update.timestamp
-      });
+      }));
     }
   }, [productId]);
 
   const { isConnected, error } = useStockUpdates({
-    productIds: [productId],
+    productIds: memoizedProductIds,
     onStockUpdate: handleStockUpdate,
-    enabled
+    enabled: enabled && !!productId
   });
 
   return {

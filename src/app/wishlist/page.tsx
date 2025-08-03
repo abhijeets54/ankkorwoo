@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, X, ShoppingBag, Check, ArrowRight, Trash2 } from 'lucide-react';
-import { useCartStore, useWishlistStore } from '@/lib/store';
+import { useWishlistStore } from '@/lib/store';
+import { useLocalCartStore } from '@/lib/localCartStore';
 import { useCustomer } from '@/components/providers/CustomerProvider';
 import Loader from '@/components/ui/loader';
 import { motion } from 'framer-motion';
@@ -61,7 +62,7 @@ const sampleWishlistItems = [
 ];
 
 export default function WishlistPage() {
-  const cart = useCartStore();
+  const cart = useLocalCartStore();
   const { items: wishlistItems, removeFromWishlist, clearWishlist } = useWishlistStore();
   const { isAuthenticated, isLoading: customerLoading } = useCustomer();
   const [isLoading, setIsLoading] = useState(true);
@@ -101,78 +102,54 @@ export default function WishlistPage() {
 
   
   // Add item to cart and optionally remove from wishlist
-  const handleAddToCart = (item: typeof wishlistItems[0], removeAfterAdd: boolean = false) => {
+  const handleAddToCart = async (item: typeof wishlistItems[0], removeAfterAdd: boolean = false) => {
     try {
-      // Check if variantId exists and is a non-empty string
-      if (!item.variantId || typeof item.variantId !== 'string' || item.variantId.trim() === '') {
-        console.error('Invalid variant ID:', item.variantId);
-        toast.error('Unable to add this item to your cart. Invalid product variant.');
-        return;
-      }
-
-      // Ensure variantId is properly formatted as a Shopify Global ID if it's not already
-      let shopifyVariantId = item.variantId;
+      console.log(`Adding item to cart: ${item.name || 'Unnamed Product'}`);
       
-      // Clean and format the variant ID
-      if (!shopifyVariantId.startsWith('gid://')) {
-        try {
-          // Extract numeric ID if possible
-          const numericId = shopifyVariantId.replace(/\D/g, '');
-          if (!numericId) {
-            throw new Error(`Could not extract a valid numeric ID from "${shopifyVariantId}"`);
-          }
-          // Format as a Shopify Global ID
-          shopifyVariantId = `gid://shopify/ProductVariant/${numericId}`;
-        } catch (error) {
-          console.error('Failed to format variant ID:', error);
-          toast.error('This product has an invalid variant ID format.');
-          return;
-        }
-      }
-      
-      console.log(`Adding item to cart: ${item.name || 'Unnamed Product'} with variant ID: ${shopifyVariantId}`);
-      
-      cart.addItem({
+      // Convert wishlist item to cart item format for localCartStore
+      const cartItem = {
         productId: item.id,
-        variantId: shopifyVariantId, // Use the properly formatted Shopify variant ID
-        title: item.name || 'Unnamed Product',
-        handle: item.handle || '#',
-        image: item.image || '/placeholder-image.jpg',
-        price: item.price ? formatPrice(item.price) : '0.00',
+        variationId: item.variantId?.replace('gid://shopify/ProductVariant/', '') || undefined, // Extract numeric ID if it's a Shopify GID
         quantity: 1,
-        currencyCode: 'INR'
-      })
-      .then(() => {
-        // On success
-        toast.success(`${item.name || 'Product'} added to your cart!`);
-        
-        // Show visual feedback
-        setAddedItems(prev => ({ ...prev, [item.id]: true }));
-        
-        // Reset visual feedback after 2 seconds
-        setTimeout(() => {
-          setAddedItems(prev => ({ ...prev, [item.id]: false }));
-        }, 2000);
-        
-        if (removeAfterAdd) {
-          removeFromWishlist(item.id);
-        }
-      })
-      .catch((error) => {
-        console.error('Error from cart.addItem:', error);
-        
-        // Provide specific error message based on the error
-        if (error.message?.includes('variant is no longer available')) {
-          toast.error('This product is no longer available in the store.');
-        } else if (error.message?.includes('Invalid variant ID')) {
-          toast.error('This product has an invalid variant format. Please try another item.');
-        } else {
-          toast.error('Unable to add this item to your cart. Please try again later.');
-        }
-      });
+        name: item.name || 'Unnamed Product',
+        price: item.price ? formatPrice(item.price) : '0.00',
+        image: item.image ? {
+          url: item.image,
+          altText: item.name || 'Product image'
+        } : undefined
+      };
+      
+      await cart.addToCart(cartItem);
+      
+      // On success
+      toast.success(`${item.name || 'Product'} added to your cart!`);
+      
+      // Show visual feedback
+      setAddedItems(prev => ({ ...prev, [item.id]: true }));
+      
+      // Reset visual feedback after 2 seconds
+      setTimeout(() => {
+        setAddedItems(prev => ({ ...prev, [item.id]: false }));
+      }, 2000);
+      
+      if (removeAfterAdd) {
+        removeFromWishlist(item.id);
+      }
     } catch (error) {
-      console.error('Error in handleAddToCart:', error);
-      toast.error('An unexpected error occurred. Please try again later.');
+      console.error('Error from cart.addToCart:', error);
+      
+      // Provide specific error message based on the error
+      if (error instanceof Error) {
+        if (error.message?.includes('out of stock')) {
+          toast.error('This product is currently out of stock.');
+        } else if (error.message?.includes('invalid')) {
+          toast.error('This product has an invalid format. Please try another item.');
+        } else {
+          toast.error(error.message || 'Unable to add this item to your cart. Please try again later.');
+        }
+      } else {
+        toast.error('An unexpected error occurred. Please try again later.');
+      }
     }
   };
   
@@ -195,41 +172,21 @@ export default function WishlistPage() {
       // Process items sequentially to avoid race conditions
       for (const item of wishlistItems) {
         try {
-          // Check if variantId exists and is valid
-          if (!item.variantId || typeof item.variantId !== 'string' || item.variantId.trim() === '') {
-            console.error('Invalid variant ID for item:', item.name || 'Unnamed Product', item.variantId);
-            errorCount++;
-            continue; // Skip this item
-          }
-          
-          // Format the variant ID
-          let variantId = item.variantId;
-          if (!variantId.startsWith('gid://')) {
-            try {
-              // Extract numeric ID if possible
-              const numericId = variantId.replace(/\D/g, '');
-              if (!numericId) {
-                throw new Error(`Could not extract a valid numeric ID from "${variantId}"`);
-              }
-              variantId = `gid://shopify/ProductVariant/${numericId}`;
-            } catch (error) {
-              console.error('Failed to format variant ID:', error);
-              errorCount++;
-              continue; // Skip this item
-            }
-          }
+          // Convert wishlist item to cart item format for localCartStore
+          const cartItem = {
+            productId: item.id,
+            variationId: item.variantId?.replace('gid://shopify/ProductVariant/', '') || undefined,
+            quantity: 1,
+            name: item.name || 'Unnamed Product',
+            price: item.price ? formatPrice(item.price) : '0.00',
+            image: item.image ? {
+              url: item.image,
+              altText: item.name || 'Product image'
+            } : undefined
+          };
           
           // Add item to cart one at a time
-          await cart.addItem({
-            productId: item.id,
-            variantId: variantId,
-            title: item.name || 'Unnamed Product',
-            handle: item.handle || '#',
-            image: item.image || '/placeholder-image.jpg',
-            price: item.price ? formatPrice(item.price) : '0.00',
-            quantity: 1,
-            currencyCode: 'INR'
-          });
+          await cart.addToCart(cartItem);
           
           // Update success count and the loading toast with progress
           successCount++;
@@ -254,8 +211,6 @@ export default function WishlistPage() {
         toast.error(`${errorCount} items could not be added`);
       } else if (successCount > 0) {
         toast.success(`All ${successCount} items added to your cart`);
-        // Open cart after adding all items
-        setTimeout(() => cart.toggleCart(), 500);
       } else {
         toast.error('Unable to add items to your cart. Please try again later.');
       }
