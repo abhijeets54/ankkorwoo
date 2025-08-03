@@ -57,8 +57,8 @@ const collections = [
 ];
 
 const sortOptions = [
-  { id: 'featured', name: 'Featured' },
   { id: 'newest', name: 'Newest' },
+  { id: 'featured', name: 'Featured' },
   { id: 'price-asc', name: 'Price: Low to High' },
   { id: 'price-desc', name: 'Price: High to Low' },
   { id: 'rating', name: 'Alphabetical' }
@@ -69,7 +69,7 @@ export default function CollectionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSort, setSelectedSort] = useState('featured');
+  const [selectedSort, setSelectedSort] = useState('newest');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   // Use the page loading hook
@@ -158,7 +158,16 @@ export default function CollectionPage() {
         // Sort by title as an alternative since rating is removed
         return a.title.localeCompare(b.title);
       case 'newest':
-        // Sort by ID as a proxy for newness (higher IDs are typically newer)
+        // Sort by creation date if available, otherwise fall back to ID comparison
+        const aDate = a._originalWooProduct?.dateCreated || a._originalWooProduct?.date_created || a.id;
+        const bDate = b._originalWooProduct?.dateCreated || b._originalWooProduct?.date_created || b.id;
+        
+        // If we have actual dates, compare them
+        if (aDate && bDate && aDate !== a.id && bDate !== b.id) {
+          return new Date(bDate).getTime() - new Date(aDate).getTime();
+        }
+        
+        // Fallback to ID comparison (higher IDs are typically newer)
         return b.id.localeCompare(a.id);
       default:
         return 0;

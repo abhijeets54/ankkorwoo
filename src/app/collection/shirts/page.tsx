@@ -281,8 +281,20 @@ export default function ShirtsCollectionPage() {
   
 
   
-  // No filtering - show all products
-  const sortedProducts = products;
+  // Sort products with newest first
+  const sortedProducts = [...products].sort((a, b) => {
+    // Sort by creation date if available, otherwise fall back to ID comparison
+    const aDate = a._originalWooProduct?.dateCreated || a._originalWooProduct?.date_created || a.id;
+    const bDate = b._originalWooProduct?.dateCreated || b._originalWooProduct?.date_created || b.id;
+    
+    // If we have actual dates, compare them
+    if (aDate && bDate && aDate !== a.id && bDate !== b.id) {
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    }
+    
+    // Fallback to ID comparison (higher IDs are typically newer)
+    return b.id.localeCompare(a.id);
+  });
   
   // Animation variants
   const fadeIn = {

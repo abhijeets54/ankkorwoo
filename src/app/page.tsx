@@ -38,7 +38,7 @@ export default function Home() {
         
         console.log(`Fetched ${products.length} products from WooCommerce`);
         
-        // Normalize the products
+        // Normalize the products and sort by newest first
         const normalizedProducts = products
           .map((product: any) => {
             const normalizedProduct = normalizeProduct(product);
@@ -48,7 +48,20 @@ export default function Home() {
             }
             return normalizedProduct;
           })
-          .filter(Boolean);
+          .filter(Boolean)
+          .sort((a, b) => {
+            // Sort by newest first - compare IDs or creation dates
+            const aDate = a._originalWooProduct?.dateCreated || a._originalWooProduct?.date_created || a.id;
+            const bDate = b._originalWooProduct?.dateCreated || b._originalWooProduct?.date_created || b.id;
+            
+            // If we have actual dates, compare them
+            if (aDate && bDate && aDate !== a.id && bDate !== b.id) {
+              return new Date(bDate).getTime() - new Date(aDate).getTime();
+            }
+            
+            // Fallback to ID comparison (higher IDs are typically newer)
+            return b.id.localeCompare(a.id);
+          });
         
         console.log('Normalized products:', normalizedProducts);
         setFeaturedProducts(normalizedProducts);
