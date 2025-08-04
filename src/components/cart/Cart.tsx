@@ -18,6 +18,7 @@ import AnimatedCheckoutButton from '@/components/cart/AnimatedCheckoutButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/components/cart/CartProvider';
 import { cartEvents, notificationEvents } from '@/lib/eventBus';
+import AuthModal from '@/components/auth/AuthModal';
 
 // Extended cart item with handle for navigation
 interface ExtendedCartItem extends CartItem {
@@ -33,6 +34,7 @@ const Cart: React.FC = () => {
   const [quantityUpdateInProgress, setQuantityUpdateInProgress] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [productHandles, setProductHandles] = useState<Record<string, string>>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const router = useRouter();
 
   // Get authentication state
@@ -222,20 +224,17 @@ const Cart: React.FC = () => {
       if (!isAuthenticated || !user) {
         setCheckoutLoading(false);
 
-        // Close the cart drawer first
+        // Close the cart drawer first to make room for the auth modal
         toggleCart();
 
-        // Show beautiful toast notification with sign-in action
+        // Show the beautiful authentication modal
+        setShowAuthModal(true);
+
+        // Also show a subtle toast notification
         notificationEvents.show(
           'Please sign in to proceed with checkout and place your order.',
           'info',
-          5000, // Show for 5 seconds
-          {
-            label: 'Sign In',
-            onClick: () => {
-              router.push('/sign-in?redirect=/checkout');
-            }
-          }
+          3000 // Show for 3 seconds
         );
 
         return;
@@ -290,8 +289,28 @@ const Cart: React.FC = () => {
   
   const hasItems = items.length > 0;
 
+  // Handle successful authentication from modal
+  const handleAuthSuccess = () => {
+    // Close the auth modal
+    setShowAuthModal(false);
+    
+    // The cart is already closed, so just proceed to checkout
+    // Proceed to checkout after a short delay to allow state updates
+    setTimeout(() => {
+      router.push('/checkout');
+    }, 500);
+  };
+
   return (
     <>
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+        redirectUrl="/checkout"
+      />
+
       {/* Backdrop */}
       <AnimatePresence>
         {isOpen && (
