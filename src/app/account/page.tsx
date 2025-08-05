@@ -71,7 +71,7 @@ interface WooCustomer {
 // GraphQL endpoint
 const endpoint = process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://your-wordpress-site.com/graphql';
 
-// Get customer query
+// Get customer query with enhanced order details and pagination
 const GET_CUSTOMER_QUERY = gql`
   query GetCustomer {
     customer {
@@ -105,25 +105,98 @@ const GET_CUSTOMER_QUERY = gql`
         postcode
         country
       }
-      orders {
+      orders(first: 20, where: {orderby: {field: DATE, order: DESC}}) {
         nodes {
           id
           databaseId
           date
           status
           total
+          subtotal
+          totalTax
+          shippingTotal
+          discountTotal
+          paymentMethodTitle
+          customerNote
+          billing {
+            firstName
+            lastName
+            company
+            address1
+            address2
+            city
+            state
+            postcode
+            country
+            email
+            phone
+          }
+          shipping {
+            firstName
+            lastName
+            company
+            address1
+            address2
+            city
+            state
+            postcode
+            country
+          }
           lineItems {
             nodes {
               product {
                 node {
                   id
                   name
+                  slug
+                  image {
+                    sourceUrl
+                    altText
+                  }
+                }
+              }
+              variation {
+                node {
+                  id
+                  name
+                  attributes {
+                    nodes {
+                      name
+                      value
+                    }
+                  }
                 }
               }
               quantity
               total
+              subtotal
+              totalTax
             }
           }
+          shippingLines {
+            nodes {
+              methodTitle
+              total
+            }
+          }
+          feeLines {
+            nodes {
+              name
+              total
+            }
+          }
+          couponLines {
+            nodes {
+              code
+              discount
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
         }
       }
     }

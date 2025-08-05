@@ -7,6 +7,7 @@ import { useLocalCartStore } from '@/lib/localCartStore';
 import { useCheckoutStore, ShippingAddress } from '@/lib/checkoutStore';
 import { useCustomer } from '@/components/providers/CustomerProvider';
 import { loadRazorpayScript, createRazorpayOrder, initializeRazorpayCheckout, verifyRazorpayPayment } from '@/lib/razorpay';
+import { getCODOrderBreakdown } from '@/lib/codPrepayment';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,7 @@ export default function CheckoutPage() {
   const cartStore = useLocalCartStore();
   const checkoutStore = useCheckoutStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'online' | 'cod_prepaid'>('online');
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CheckoutFormData>({
     mode: 'onChange'
@@ -165,79 +167,12 @@ export default function CheckoutPage() {
         throw new Error('Payment gateway not configured. Please contact support.');
       }
 
-      // Create Razorpay order
-      console.log('Creating Razorpay order for amount:', checkoutStore.finalAmount);
-      const razorpayOrder = await createRazorpayOrder(
-        checkoutStore.finalAmount,
-        `order_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-        {
-          customer_phone: checkoutStore.shippingAddress.phone,
-          customer_name: `${checkoutStore.shippingAddress.firstName} ${checkoutStore.shippingAddress.lastName}`,
-          shipping_method: checkoutStore.selectedShipping.name,
-        }
-      );
-
-      console.log('Razorpay order created:', razorpayOrder.id);
-
-      // Initialize Razorpay checkout
-      await initializeRazorpayCheckout({
-        key: razorpayKeyId,
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        name: 'Ankkor',
-        description: `Order Payment - ${checkoutStore.cart.length} item(s)`,
-        order_id: razorpayOrder.id,
-        handler: async (response) => {
-          // Verify payment and create order
-          console.log('Payment successful, verifying...', response);
-          checkoutStore.setError(null);
-
-          try {
-            const verificationResult = await verifyRazorpayPayment(response, {
-              address: checkoutStore.shippingAddress,
-              cartItems: checkoutStore.cart,
-              shipping: checkoutStore.selectedShipping,
-            });
-
-            console.log('Payment verification result:', verificationResult);
-
-            if (verificationResult.success) {
-              // Clear cart and checkout state
-              cartStore.clearCart();
-              checkoutStore.clearCheckout();
-
-              // Redirect to order confirmation
-              router.push(`/order-confirmed?id=${verificationResult.orderId}`);
-            } else {
-              throw new Error(verificationResult.message || 'Payment verification failed');
-            }
-          } catch (error) {
-            console.error('Payment verification error:', error);
-            checkoutStore.setError(
-              error instanceof Error
-                ? error.message
-                : 'Payment verification failed. Please contact support if amount was deducted.'
-            );
-          } finally {
-            setIsSubmitting(false);
-            checkoutStore.setProcessingPayment(false);
-          }
-        },
-        prefill: {
-          name: `${checkoutStore.shippingAddress.firstName} ${checkoutStore.shippingAddress.lastName}`,
-          contact: checkoutStore.shippingAddress.phone,
-        },
-        theme: {
-          color: '#2c2c27',
-        },
-        modal: {
-          ondismiss: () => {
-            console.log('Payment modal dismissed');
-            setIsSubmitting(false);
-            checkoutStore.setProcessingPayment(false);
-          }
-        }
-      });
+      // Handle different payment methods
+      if (selectedPaymentMethod === 'cod_prepaid') {
+        await handleCODPrepayment(razorpayKeyId);
+      } else {
+        await handleOnlinePayment(razorpayKeyId);
+      }
 
     } catch (error: any) {
       console.error('Payment error:', error);
@@ -259,6 +194,179 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
       checkoutStore.setProcessingPayment(false);
     }
+  };
+
+  const handleOnlinePayment = async (razorpayKeyId: string) => {
+    // Create Razorpay order for full amount
+    console.log('Creating Razorpay order for amount:', checkoutStore.finalAmount);
+    const razorpayOrder = await createRazorpayOrder(
+      checkoutStore.finalAmount,
+      `order_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      {
+        customer_phone: checkoutStore.shippingAddress!.phone,
+        customer_name: `${checkoutStore.shippingAddress!.firstName} ${checkoutStore.shippingAddress!.lastName}`,
+        shipping_method: checkoutStore.selectedShipping!.name,
+        payment_method: 'online'
+      }
+    );
+
+    console.log('Razorpay order created:', razorpayOrder.id);
+
+    // Initialize Razorpay checkout
+    await initializeRazorpayCheckout({
+      key: razorpayKeyId,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      name: 'Ankkor',
+      description: `Full Payment - ${checkoutStore.cart.length} item(s)`,
+      order_id: razorpayOrder.id,
+      handler: async (response) => {
+        // Verify payment and create order
+        console.log('Payment successful, verifying...', response);
+        checkoutStore.setError(null);
+
+        try {
+          const verificationResult = await verifyRazorpayPayment(response, {
+            address: checkoutStore.shippingAddress,
+            cartItems: checkoutStore.cart,
+            shipping: checkoutStore.selectedShipping,
+          });
+
+          console.log('Payment verification result:', verificationResult);
+
+          if (verificationResult.success) {
+            // Clear cart and checkout state
+            cartStore.clearCart();
+            checkoutStore.clearCheckout();
+
+            // Redirect to order confirmation
+            router.push(`/order-confirmed?id=${verificationResult.orderId}`);
+          } else {
+            throw new Error(verificationResult.message || 'Payment verification failed');
+          }
+        } catch (error) {
+          console.error('Payment verification error:', error);
+          checkoutStore.setError(
+            error instanceof Error
+              ? error.message
+              : 'Payment verification failed. Please contact support if amount was deducted.'
+          );
+        } finally {
+          setIsSubmitting(false);
+          checkoutStore.setProcessingPayment(false);
+        }
+      },
+      prefill: {
+        name: `${checkoutStore.shippingAddress!.firstName} ${checkoutStore.shippingAddress!.lastName}`,
+        contact: checkoutStore.shippingAddress!.phone,
+      },
+      theme: {
+        color: '#2c2c27',
+      },
+      modal: {
+        ondismiss: () => {
+          console.log('Payment modal dismissed');
+          setIsSubmitting(false);
+          checkoutStore.setProcessingPayment(false);
+        }
+      }
+    });
+  };
+
+  const handleCODPrepayment = async (razorpayKeyId: string) => {
+    // Create Razorpay order for ₹100 convenience fee only
+    const convenienteFee = 100;
+    console.log('Creating COD prepayment order for convenience fee:', convenienteFee);
+    
+    const razorpayOrder = await createRazorpayOrder(
+      convenienteFee,
+      `cod_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      {
+        customer_phone: checkoutStore.shippingAddress!.phone,
+        customer_name: `${checkoutStore.shippingAddress!.firstName} ${checkoutStore.shippingAddress!.lastName}`,
+        shipping_method: checkoutStore.selectedShipping!.name,
+        payment_method: 'cod_prepaid',
+        cod_convenience_fee: 'true'
+      }
+    );
+
+    console.log('COD prepayment order created:', razorpayOrder.id);
+
+    // Initialize Razorpay checkout for convenience fee
+    await initializeRazorpayCheckout({
+      key: razorpayKeyId,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      name: 'Ankkor',
+      description: `COD Convenience Fee - ₹${convenienteFee}`,
+      order_id: razorpayOrder.id,
+      handler: async (response) => {
+        // Verify COD prepayment and create order
+        console.log('COD convenience fee payment successful, verifying...', response);
+        checkoutStore.setError(null);
+
+        try {
+          // Use special COD verification endpoint
+          const verificationResult = await fetch('/api/razorpay/cod-prepayment', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              address: checkoutStore.shippingAddress,
+              cartItems: checkoutStore.cart,
+              shipping: checkoutStore.selectedShipping,
+            }),
+          });
+
+          if (!verificationResult.ok) {
+            const errorData = await verificationResult.json();
+            throw new Error(errorData.message || 'COD prepayment verification failed');
+          }
+
+          const data = await verificationResult.json();
+          console.log('COD prepayment verification result:', data);
+
+          if (data.success) {
+            // Clear cart and checkout state
+            cartStore.clearCart();
+            checkoutStore.clearCheckout();
+
+            // Redirect to order confirmation with COD info
+            router.push(`/order-confirmed?id=${data.orderId}&cod=true`);
+          } else {
+            throw new Error(data.message || 'COD prepayment verification failed');
+          }
+        } catch (error) {
+          console.error('COD prepayment verification error:', error);
+          checkoutStore.setError(
+            error instanceof Error
+              ? error.message
+              : 'COD prepayment verification failed. Please contact support if amount was deducted.'
+          );
+        } finally {
+          setIsSubmitting(false);
+          checkoutStore.setProcessingPayment(false);
+        }
+      },
+      prefill: {
+        name: `${checkoutStore.shippingAddress!.firstName} ${checkoutStore.shippingAddress!.lastName}`,
+        contact: checkoutStore.shippingAddress!.phone,
+      },
+      theme: {
+        color: '#2c2c27',
+      },
+      modal: {
+        ondismiss: () => {
+          console.log('COD prepayment modal dismissed');
+          setIsSubmitting(false);
+          checkoutStore.setProcessingPayment(false);
+        }
+      }
+    });
   };
 
   // Show loading while checking authentication
@@ -384,12 +492,12 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <Button
+              {/* <Button
                 type="submit"
                 className="mt-4 w-full bg-[#2c2c27] hover:bg-[#3c3c37] text-white"
               >
                 Save Address & Continue
-              </Button>
+              </Button> */}
             </form>
           </div>
 
@@ -444,22 +552,81 @@ export default function CheckoutPage() {
           <div className="bg-white p-6 border rounded-lg shadow-sm">
             <h2 className="text-xl font-medium mb-4 flex items-center">
               <CreditCard className="mr-2 h-5 w-5" />
-              Payment
+              Payment Method
             </h2>
 
             <div className="space-y-4">
-              <div className="flex items-center p-4 border rounded-lg">
+              {/* Online Payment Option */}
+              <div 
+                className={`flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
+                  selectedPaymentMethod === 'online' ? 'border-[#2c2c27] bg-[#2c2c27]/5' : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setSelectedPaymentMethod('online')}
+              >
                 <input
                   type="radio"
-                  id="razorpay"
+                  id="online"
                   name="payment"
-                  checked={true}
-                  readOnly
-                  className="mr-3"
+                  checked={selectedPaymentMethod === 'online'}
+                  onChange={() => setSelectedPaymentMethod('online')}
+                  className="mr-3 mt-1"
                 />
-                <div>
-                  <label htmlFor="razorpay" className="font-medium">Razorpay</label>
-                  <p className="text-sm text-gray-600">Pay securely with credit card, debit card, UPI, or net banking</p>
+                <div className="flex-1">
+                  <label htmlFor="online" className="font-medium cursor-pointer">Pay Online</label>
+                  <p className="text-sm text-gray-600 mt-1">Pay securely with credit card, debit card, UPI, or net banking</p>
+                  <div className="mt-2 text-sm">
+                    <span className="font-medium text-[#2c2c27]">Total: ₹{checkoutStore.finalAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* COD Option */}
+              <div 
+                className={`flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
+                  selectedPaymentMethod === 'cod_prepaid' ? 'border-[#2c2c27] bg-[#2c2c27]/5' : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setSelectedPaymentMethod('cod_prepaid')}
+              >
+                <input
+                  type="radio"
+                  id="cod_prepaid"
+                  name="payment"
+                  checked={selectedPaymentMethod === 'cod_prepaid'}
+                  onChange={() => setSelectedPaymentMethod('cod_prepaid')}
+                  className="mr-3 mt-1"
+                />
+                <div className="flex-1">
+                  <label htmlFor="cod_prepaid" className="font-medium cursor-pointer">Cash on Delivery</label>
+                  <p className="text-sm text-gray-600 mt-1">Pay ₹100 convenience fee now, pay order amount on delivery</p>
+                  
+                  {selectedPaymentMethod === 'cod_prepaid' && checkoutStore.cart.length > 0 && checkoutStore.selectedShipping && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span>Order Total:</span>
+                          <span>₹{checkoutStore.finalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-orange-600 font-medium">
+                          <span>COD Convenience Fee:</span>
+                          <span>₹100.00</span>
+                        </div>
+                        <div className="border-t border-yellow-300 pt-2 mt-2">
+                          <div className="flex justify-between font-medium text-green-700">
+                            <span>Pay Online Now:</span>
+                            <span>₹100.00</span>
+                          </div>
+                          <div className="flex justify-between font-medium text-blue-700">
+                            <span>Pay on Delivery:</span>
+                            <span>₹{checkoutStore.finalAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-[#2c2c27] text-base mt-1 pt-1 border-t border-yellow-300">
+                            <span>Total Cost:</span>
+                            <span>₹{(checkoutStore.finalAmount + 100).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -473,6 +640,8 @@ export default function CheckoutPage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing Payment...
                   </>
+                ) : selectedPaymentMethod === 'cod_prepaid' ? (
+                  'Pay ₹100 Convenience Fee'
                 ) : (
                   `Proceed to Pay - ₹${checkoutStore.finalAmount.toFixed(2)}`
                 )}
