@@ -5,95 +5,41 @@ import { Search, X, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/ui/loader';
 import Image from 'next/image';
-import Link from 'next/link';
-import { getAllProducts } from '@/lib/woocommerce';
-
-// Implement useDebounce hook locally to avoid import issues
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
+import { useDebounce } from '@/hooks/useDebounce';
+import { useSearchStore } from '@/store/searchStore';
+import { formatPriceSafe } from '@/lib/productUtils';
 
 interface SearchBarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type Product = {
-  id: string;
-  title: string;
-  handle: string;
-  description?: string;
-  image: string;
-  price: string;
-  tags: string[];
-  category?: string;
-};
-
 const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
   const [query, setQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [showPredictive, setShowPredictive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  
+
+  // Use search store for state management
+  const {
+    allProducts,
+    filteredProducts,
+    isLoading,
+    isInitialized,
+    loadProducts,
+    setQuery: setStoreQuery
+  } = useSearchStore();
+
   // Debounce the search query to avoid excessive filtering operations
   const debouncedQuery = useDebounce(query, 150);
 
-  // Load all products when component mounts
+  // Load all products when search bar opens
   useEffect(() => {
-    const loadAllProducts = async () => {
-      try {
-        setInitialLoading(true);
-        const products = await getAllProducts(100); // Get a reasonable number of products
-        
-        // Format products for our search needs
-        const formattedProducts = products.map((product: any) => {
-          const firstVariant = product.variants?.edges?.[0]?.node || null;
-          const imageUrl = product.images?.edges?.[0]?.node?.url || '';
-          const category = product.collections?.edges?.[0]?.node?.handle || 'clothing';
-          
-          return {
-            id: product.id || '',
-            title: product.title || 'Untitled Product',
-            handle: product.handle || '',
-            description: product.description || '',
-            image: imageUrl,
-            price: firstVariant?.price?.amount || 
-                   product.priceRange?.minVariantPrice?.amount || 
-                   '0.00',
-            tags: Array.isArray(product.tags) ? product.tags : [],
-            category
-          };
-        });
-        
-        setAllProducts(formattedProducts);
-      } catch (error) {
-        console.error('Error loading products for search:', error);
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-    
-    if (isOpen) {
-      loadAllProducts();
+    if (isOpen && !isInitialized) {
+      loadProducts();
     }
-  }, [isOpen]);
+  }, [isOpen, isInitialized, loadProducts]);
 
   // Focus input when search bar opens
   useEffect(() => {
@@ -102,37 +48,11 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
     }
   }, [isOpen]);
 
-  // Filter products based on search query
+  // Update store query when debounced query changes
   useEffect(() => {
-    if (!debouncedQuery.trim() || debouncedQuery.length < 2) {
-      setFilteredProducts([]);
-      setShowPredictive(false);
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    // Filter products that match the search query
-    const searchTerms = debouncedQuery.toLowerCase().split(' ').filter((term: string) => term.length > 0);
-    
-    const results = allProducts.filter(product => {
-      if (!product) return false;
-      
-      // Check if any search term is included in product fields
-      return searchTerms.every((term: string) => {
-        const titleMatch = product.title?.toLowerCase().includes(term);
-        const descriptionMatch = product.description?.toLowerCase().includes(term);
-        const tagMatch = product.tags?.some(tag => tag.toLowerCase().includes(term));
-        const categoryMatch = product.category?.toLowerCase().includes(term);
-        
-        return titleMatch || descriptionMatch || tagMatch || categoryMatch;
-      });
-    }).slice(0, 5); // Limit to 5 results for the dropdown
-    
-    setFilteredProducts(results);
-    setShowPredictive(results.length > 0);
-    setIsLoading(false);
-  }, [debouncedQuery, allProducts]);
+    setStoreQuery(debouncedQuery);
+    setShowPredictive(debouncedQuery.trim().length >= 2 && filteredProducts.length > 0);
+  }, [debouncedQuery, setStoreQuery, filteredProducts.length]);
 
   // Handle click outside of predictive results to close it
   useEffect(() => {
@@ -156,18 +76,16 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
   // Handle search submission
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!query.trim()) return;
-    
-    setIsLoading(true);
+
     setShowPredictive(false);
-    
+
     // Navigate to search results page
     router.push(`/search?q=${encodeURIComponent(query.trim())}`);
-    
+
     // Reset state
     setTimeout(() => {
-      setIsLoading(false);
       onClose();
     }, 300);
   };
@@ -179,9 +97,9 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
     }
   };
 
-  const handleProductClick = (handle: string) => {
+  const handleProductClick = (slug: string) => {
     setShowPredictive(false);
-    router.push(`/product/${handle}`);
+    router.push(`/product/${slug}`);
     onClose();
   };
 
@@ -220,16 +138,16 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
             >
               <div className="max-h-96 overflow-y-auto">
                 {filteredProducts.map((product) => (
-                  <div 
+                  <div
                     key={product.id}
-                    onClick={() => handleProductClick(product.handle)}
+                    onClick={() => handleProductClick(product.slug)}
                     className="flex items-center p-3 hover:bg-[#f4f3f0] cursor-pointer transition-colors border-b border-[#e5e2d9] last:border-0"
                   >
                     <div className="flex-shrink-0 w-16 h-16 bg-[#f4f3f0] overflow-hidden rounded">
                       {product.image && (
-                        <Image 
-                          src={product.image} 
-                          alt={product.title}
+                        <Image
+                          src={product.image}
+                          alt={product.name}
                           width={64}
                           height={64}
                           className="w-full h-full object-cover"
@@ -237,8 +155,10 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
                       )}
                     </div>
                     <div className="ml-4 flex-1">
-                      <h4 className="text-[#2c2c27] font-medium line-clamp-1">{product.title}</h4>
-                      <p className="text-[#8a8778] text-sm mt-1">₹{parseFloat(product.price).toFixed(2)}</p>
+                      <h4 className="text-[#2c2c27] font-medium line-clamp-1">{product.name}</h4>
+                      {product.categories.length > 0 && (
+                        <p className="text-[#8a8778] text-xs mt-1">{product.categories[0]}</p>
+                      )}
                     </div>
                     <ArrowRight className="h-4 w-4 text-[#8a8778] ml-2" />
                   </div>
@@ -258,9 +178,10 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
         </div>
         
         <div className="p-4 text-[#5c5c52] text-sm">
-          {initialLoading ? (
+          {!isInitialized ? (
             <div className="flex items-center justify-center py-8">
               <Loader size="md" color="#8a8778" />
+              <span className="ml-2 text-sm">Loading products...</span>
             </div>
           ) : isLoading && !showPredictive ? (
             <div className="flex items-center justify-center py-8">
@@ -270,7 +191,7 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
             <div className="space-y-2">
               <p className="font-medium">Popular Searches:</p>
               <div className="flex flex-wrap gap-2">
-                {['Shirt', 'Pant', 'Polo'].map((term) => (
+                {['Shirt', 'T-Shirt', 'Polo', 'Jeans', 'Jacket', 'Dress'].map((term) => (
                   <button
                     key={term}
                     onClick={() => {
@@ -285,6 +206,9 @@ const SearchBar = ({ isOpen, onClose }: SearchBarProps) => {
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-[#8a8778] mt-2">
+                Start typing to see instant results from {allProducts.length} products
+              </p>
             </div>
           )}
         </div>

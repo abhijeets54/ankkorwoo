@@ -110,10 +110,15 @@ export function hasLowInventory(variant: any, threshold = 5) {
  */
 export function formatPrice(amount: string | number, currencyCode = 'INR') {
   if (!amount) return '';
-  
+
   // Convert string to number if needed
   const price = typeof amount === 'string' ? parseFloat(amount) : amount;
-  
+
+  // Handle invalid prices (NaN, negative, etc.)
+  if (isNaN(price) || price < 0) {
+    return '';
+  }
+
   // Return formatted price based on currency
   switch (currencyCode) {
     case 'INR':
@@ -126,6 +131,31 @@ export function formatPrice(amount: string | number, currencyCode = 'INR') {
       return `£${price.toFixed(2)}`;
     default:
       return `${price.toFixed(2)} ${currencyCode}`;
+  }
+}
+
+/**
+ * Safe price formatting that always returns a valid price string
+ * @param amount The price amount as a string or number
+ * @param currencyCode The currency code (default: INR for Indian Rupees)
+ * @param fallback The fallback price to show if amount is invalid (default: '0.00')
+ */
+export function formatPriceSafe(amount: string | number, currencyCode = 'INR', fallback = '0.00') {
+  const formatted = formatPrice(amount, currencyCode);
+  if (formatted) return formatted;
+
+  // Return fallback with currency symbol
+  switch (currencyCode) {
+    case 'INR':
+      return `₹${fallback}`;
+    case 'USD':
+      return `$${fallback}`;
+    case 'EUR':
+      return `€${fallback}`;
+    case 'GBP':
+      return `£${fallback}`;
+    default:
+      return `${fallback} ${currencyCode}`;
   }
 }
 

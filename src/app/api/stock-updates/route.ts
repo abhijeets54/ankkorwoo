@@ -45,12 +45,17 @@ export async function GET(request: NextRequest) {
             const stockUpdate = await redis.get(`stock_update:${productId}`);
             if (stockUpdate) {
               // Send stock update to client
-              controller.enqueue(`data: ${JSON.stringify({
-                type: 'stock_update',
-                productId,
-                ...stockUpdate,
-                timestamp: new Date().toISOString()
-              })}\n\n`);
+              try {
+                controller.enqueue(`data: ${JSON.stringify({
+                  type: 'stock_update',
+                  productId,
+                  ...stockUpdate,
+                  timestamp: new Date().toISOString()
+                })}\n\n`);
+              } catch (error) {
+                // Controller closed, stop checking
+                return;
+              }
 
               // Remove the update after sending (optional)
               await redis.del(`stock_update:${productId}`);
@@ -60,11 +65,15 @@ export async function GET(request: NextRequest) {
           console.error('Error checking stock updates:', error);
 
           // Send error notification to client
-          controller.enqueue(`data: ${JSON.stringify({
-            type: 'error',
-            message: 'Stock update service temporarily unavailable',
-            timestamp: new Date().toISOString()
-          })}\n\n`);
+          try {
+            controller.enqueue(`data: ${JSON.stringify({
+              type: 'error',
+              message: 'Stock update service temporarily unavailable',
+              timestamp: new Date().toISOString()
+            })}\n\n`);
+          } catch (error) {
+            // Controller closed, ignore
+          }
         }
       };
 
@@ -85,17 +94,32 @@ export async function GET(request: NextRequest) {
 
       // Send heartbeat every 30 seconds to keep connection alive
       const heartbeat = setInterval(() => {
-        controller.enqueue(`data: ${JSON.stringify({
-          type: 'heartbeat',
-          timestamp: new Date().toISOString()
-        })}\n\n`);
+        if (isCleanedUp) return;
+        try {
+          controller.enqueue(`data: ${JSON.stringify({
+            type: 'heartbeat',
+            timestamp: new Date().toISOString()
+          })}\n\n`);
+        } catch (error) {
+          // Controller closed, cleanup if not already done
+          cleanup();
+        }
       }, 30000);
 
       // Cleanup function
+      let isCleanedUp = false;
       const cleanup = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
+        
         if (interval) clearInterval(interval);
         clearInterval(heartbeat);
-        controller.close();
+        
+        try {
+          controller.close();
+        } catch (error) {
+          // Controller already closed, ignore
+        }
       };
 
       // Handle client disconnect

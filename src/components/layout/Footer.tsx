@@ -13,7 +13,7 @@ const Footer = () => {
             {/* Column 1: About */}
             <div className="space-y-6">
               <div>
-                <Image src="/logo.PNG" alt="Ankkor" width={160} height={50} className="h-12 w-auto invert" />
+                <Image src="/logo.PNG" alt="Ankkor" width={160} height={50} className="h-12 w-auto" />
               </div>
               <p className="text-[#d5d0c3] text-sm leading-relaxed">
                 Timeless menswear crafted with exceptional materials and artisanal techniques, 

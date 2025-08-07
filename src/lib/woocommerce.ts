@@ -2175,7 +2175,16 @@ export async function searchProducts(
           databaseId
           name
           slug
-          price
+          ... on SimpleProduct {
+            price
+            regularPrice
+            salePrice
+          }
+          ... on VariableProduct {
+            price
+            regularPrice
+            salePrice
+          }
           image {
             sourceUrl
             altText
