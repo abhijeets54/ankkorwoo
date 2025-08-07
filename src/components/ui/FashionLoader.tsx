@@ -7,12 +7,14 @@ interface FashionLoaderProps {
   size?: 'sm' | 'md' | 'lg';
   variant?: 'thread' | 'fabric' | 'button';
   className?: string;
+  text?: string;
 }
 
 const FashionLoader = ({ 
   size = 'md', 
   variant = 'thread', 
-  className = '' 
+  className = '',
+  text
 }: FashionLoaderProps) => {
   // Size mappings
   const sizeMap = {
@@ -59,7 +61,7 @@ const FashionLoader = ({
             <div className="w-2 h-2 rounded-full bg-[#2c2c27]" />
           </div>
         </div>
-        <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>Loading Collection</p>
+        <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>{text || 'Loading Collection'}</p>
       </div>
     );
   }
@@ -108,7 +110,7 @@ const FashionLoader = ({
             }}
           />
         </div>
-        <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>Preparing Your Style</p>
+        <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>{text || 'Preparing Your Style'}</p>
       </div>
     );
   }
@@ -139,7 +141,7 @@ const FashionLoader = ({
             ))}
           </div>
         </div>
-        <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>Tailoring Experience</p>
+        <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>{text || 'Tailoring Experience'}</p>
       </div>
     );
   }
@@ -159,7 +161,7 @@ const FashionLoader = ({
           }}
         />
       </div>
-      <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>Loading</p>
+      <p className={`mt-4 font-serif text-[#5c5c52] ${sizeMap[size].text}`}>{text || 'Loading'}</p>
     </div>
   );
 };

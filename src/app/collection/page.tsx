@@ -9,6 +9,7 @@ import { getAllProducts, normalizeProduct, getMetafield } from '@/lib/woocommerc
 import usePageLoading from '@/hooks/usePageLoading';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
 import { Skeleton } from '@/components/ui/skeleton';
+import FashionLoader from '@/components/ui/FashionLoader';
 
 // Define product type
 interface ProductImage {
@@ -367,14 +368,13 @@ export default function CollectionPage() {
             
             {/* Loading state */}
             {isLoading && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {Array.from({ length: 9 }).map((_, index) => (
-                  <div key={index} className="animate-pulse">
-                    <Skeleton className="w-full h-80 mb-4" />
-                    <Skeleton className="w-3/4 h-4 mb-2" />
-                    <Skeleton className="w-1/2 h-4" />
-                  </div>
-                ))}
+              <div className="flex justify-center items-center py-20">
+                <FashionLoader 
+                  size="lg" 
+                  variant="fabric" 
+                  className="min-h-[200px]" 
+                  text="Loading Products"
+                />
               </div>
             )}
 

@@ -12,6 +12,7 @@ import ImageLoader from '@/components/ui/ImageLoader';
 import usePageLoading from '@/hooks/usePageLoading';
 import { getAllProducts, normalizeProduct, getMetafield, normalizeProductImages } from '@/lib/woocommerce';
 import { Skeleton } from '@/components/ui/skeleton';
+import FashionLoader from '@/components/ui/FashionLoader';
 import BannerSlider from '@/components/home/BannerSlider';
 import NewsletterPopup from '@/components/home/NewsletterPopup';
 import LaunchingSoon from '@/components/home/LaunchingSoon';
@@ -183,15 +184,15 @@ export default function Home() {
             </p>
           </div>
           
+          
           {isLoading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="animate-pulse">
-                  <Skeleton className="w-full h-80 mb-4" />
-                  <Skeleton className="w-3/4 h-4 mb-2" />
-                  <Skeleton className="w-1/2 h-4" />
-                </div>
-              ))}
+            <div className="flex justify-center items-center py-20">
+              <FashionLoader 
+                size="lg" 
+                variant="thread" 
+                className="min-h-[200px]" 
+                text="Loading Products"
+              />
             </div>
           )}
 
