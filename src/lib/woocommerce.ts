@@ -2118,6 +2118,79 @@ export async function getProductById(id: string, revalidate = 60) {
 }
 
 /**
+ * Get product with stock information for real-time updates
+ * @param id Product ID
+ * @param revalidate Cache revalidation time in seconds
+ * @returns Product with stock data or null if not found
+ */
+export async function getProductByIdWithStock(id: string, revalidate = 30) {
+  try {
+    // Check if ID is in a valid format
+    if (!id || id === 'undefined' || id === 'null') {
+      console.warn(`Invalid product ID format for stock check: ${id}`);
+      return null;
+    }
+    
+    // Validate and transform the product ID
+    const validatedId = await validateProductId(id);
+    
+    // Define cache tags for this product (shorter cache for stock data)
+    const tags = [`stock-${validatedId}`, 'inventory'];
+    
+    // Define the query focused on stock information
+    const QUERY_PRODUCT_STOCK = gql`
+      query GetProductStock($id: ID!) {
+        product(id: $id, idType: DATABASE_ID) {
+          id
+          databaseId
+          name
+          ... on SimpleProduct {
+            stockStatus
+            stockQuantity
+          }
+          ... on VariableProduct {
+            stockStatus
+            stockQuantity
+            variations {
+              nodes {
+                id
+                databaseId
+                stockStatus
+                stockQuantity
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      // Fetch the stock data with shorter cache
+      const data = await fetchFromWooCommerce(
+        QUERY_PRODUCT_STOCK, 
+        { id: validatedId }, 
+        tags, 
+        revalidate
+      );
+      
+      // Check if product exists
+      if (!data?.product) {
+        console.warn(`No product found with ID for stock check: ${id}`);
+        return null;
+      }
+      
+      return data.product;
+    } catch (error) {
+      console.error(`Error fetching stock for product ${id}:`, error);
+      return null;
+    }
+  } catch (error) {
+    console.error(`Error in getProductByIdWithStock for ID ${id}:`, error);
+    return null;
+  }
+}
+
+/**
  * Create a fallback product for when a product cannot be found
  * @param id The original product ID
  * @returns A fallback product object

@@ -435,6 +435,7 @@ export default function CollectionPage() {
                       image={product.images[0]?.url || ''}
                       isNew={true}
                       stockStatus={originalProduct?.stockStatus || "IN_STOCK"}
+                      stockQuantity={originalProduct?.stockQuantity}
                       compareAtPrice={product.compareAtPrice}
                       regularPrice={originalProduct?.regularPrice}
                       salePrice={originalProduct?.salePrice}

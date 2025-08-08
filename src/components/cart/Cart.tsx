@@ -488,19 +488,19 @@ const Cart: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Clear Cart Button */}
-            <Button
-              onClick={handleClearCart}
-              variant="ghost"
-              size="sm"
-              disabled={checkoutLoading || quantityUpdateInProgress || !hasItems}
-              className="w-full text-center text-[#8a8778] hover:text-[#2c2c27] hover:bg-[#f4f3f0] mt-2 transition-colors"
-            >
-              <Trash2 className="h-3 w-3 mr-1" />
-              Clear Cart
-            </Button>
+              {/* Clear Cart Button */}
+              <Button
+                onClick={handleClearCart}
+                variant="ghost"
+                size="sm"
+                disabled={checkoutLoading || quantityUpdateInProgress || !hasItems}
+                className="w-full text-center text-[#8a8778] hover:text-[#2c2c27] hover:bg-[#f4f3f0] transition-colors"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clear Cart
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

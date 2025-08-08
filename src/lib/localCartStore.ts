@@ -195,6 +195,22 @@ export const useLocalCartStore = create<LocalCartStore>()(
             price: normalizedPrice
           };
 
+          // Trigger stock update broadcast after successful validation
+          try {
+            await fetch('/api/stock-updates/trigger', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productId: item.productId,
+                type: 'cart_addition',
+                quantity: item.quantity
+              })
+            });
+          } catch (error) {
+            console.warn('Failed to trigger stock update broadcast:', error);
+            // Don't fail the cart addition if broadcast fails
+          }
+
           // Check if the item already exists in the cart
           const existingItemIndex = items.findIndex(
             (cartItem) =>

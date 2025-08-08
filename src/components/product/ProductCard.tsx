@@ -9,6 +9,7 @@ import { useCart } from '@/components/cart/CartProvider';
 import ImageLoader from '@/components/ui/ImageLoader';
 import { DEFAULT_CURRENCY_SYMBOL, DEFAULT_CURRENCY_CODE } from '@/lib/currency';
 import { toast } from 'react-hot-toast';
+import { useSimpleStockUpdates } from '@/hooks/useSimpleStockUpdates';
 
 // Helper function to clean price for storage
 const cleanPriceForStorage = (price: string | number): string => {
@@ -30,6 +31,7 @@ interface ProductCardProps {
   material?: string;
   isNew?: boolean;
   stockStatus?: string;
+  stockQuantity?: number;
   compareAtPrice?: string | null;
   regularPrice?: string | null;
   salePrice?: string | null;
@@ -49,6 +51,7 @@ const ProductCard = ({
   material,
   isNew = false,
   stockStatus = 'IN_STOCK',
+  stockQuantity,
   compareAtPrice = null,
   regularPrice = null,
   salePrice = null,
@@ -65,6 +68,13 @@ const ProductCard = ({
   const { isAuthenticated } = useCustomer();
 
   const inWishlist = isInWishlist(id);
+  
+  // Use real-time stock updates
+  const realtimeStockData = useSimpleStockUpdates(id, {
+    stockStatus: stockStatus,
+    stockQuantity: stockQuantity,
+    availableForSale: stockStatus === 'IN_STOCK'
+  });
   
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -137,7 +147,11 @@ const ProductCard = ({
     ? Math.round(((parseFloat(compareAtPrice) - parseFloat(price)) / parseFloat(compareAtPrice)) * 100) 
     : null;
   
-  const isOutOfStock = stockStatus !== 'IN_STOCK';
+  // Enhanced stock management with real-time updates
+  const currentStockStatus = realtimeStockData?.stockStatus || stockStatus;
+  const currentStockQuantity = realtimeStockData?.stockQuantity ?? stockQuantity;
+  const isOutOfStock = currentStockStatus === 'OUT_OF_STOCK' || currentStockQuantity === 0;
+  const isLowStock = currentStockQuantity !== undefined && currentStockQuantity > 0 && currentStockQuantity <= 5;
   
   return (
     <motion.div 
@@ -173,14 +187,27 @@ const ProductCard = ({
 
             <motion.button
               onClick={handleAddToCart}
-              className={`p-2 rounded-none ${isOutOfStock || isAddingToCart ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#2c2c27]'} text-[#f4f3f0]`}
+              className={`p-2 rounded-none transition-all duration-300 ${
+                isOutOfStock 
+                  ? 'bg-[#d5d0c3] cursor-not-allowed text-[#8a8778]' 
+                  : isAddingToCart 
+                    ? 'bg-[#8a8778] text-[#f4f3f0] cursor-wait' 
+                    : 'bg-[#2c2c27] text-[#f4f3f0] hover:bg-[#1a1a17]'
+              }`}
               whileHover={isOutOfStock || isAddingToCart ? {} : { scale: 1.05 }}
               whileTap={isOutOfStock || isAddingToCart ? {} : { scale: 0.95 }}
+              animate={isAddingToCart ? { scale: [1, 1.02, 1] } : {}}
+              transition={isAddingToCart ? { duration: 0.8, repeat: Infinity, ease: "easeInOut" } : {}}
               aria-label={isOutOfStock ? "Out of stock" : isAddingToCart ? "Adding to cart..." : "Add to cart"}
               disabled={isOutOfStock || isAddingToCart}
             >
               {isAddingToCart ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
+                  <Loader2 className="h-5 w-5" />
+                </motion.div>
               ) : (
                 <ShoppingBag className="h-5 w-5" />
               )}
@@ -266,12 +293,14 @@ const ProductCard = ({
             {/* Stock Status */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {stockStatus === 'IN_STOCK' ? (
-                  <span className="text-green-600 text-xs font-medium">✓ In Stock</span>
-                ) : stockStatus === 'OUT_OF_STOCK' ? (
+                {isOutOfStock ? (
                   <span className="text-red-600 text-xs font-medium">✗ Out of Stock</span>
-                ) : stockStatus === 'ON_BACKORDER' ? (
+                ) : isLowStock ? (
+                  <span className="text-orange-600 text-xs font-medium">⚠️ Only {currentStockQuantity} left</span>
+                ) : currentStockStatus === 'ON_BACKORDER' ? (
                   <span className="text-orange-600 text-xs font-medium">⏳ Backorder</span>
+                ) : currentStockStatus === 'IN_STOCK' ? (
+                  <span className="text-green-600 text-xs font-medium">✓ In Stock</span>
                 ) : (
                   <span className="text-gray-600 text-xs font-medium">? Unknown</span>
                 )}
@@ -293,25 +322,44 @@ const ProductCard = ({
         {/* Add to Cart Strip Button */}
         <motion.button
           onClick={handleAddToCart}
-          className={`w-full py-3 px-4 transition-all duration-200 ${
-            isOutOfStock || isAddingToCart
-              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-              : 'bg-[#2c2c27] text-[#f4f3f0] hover:bg-[#1a1a17]'
+          className={`w-full py-3 px-4 transition-all duration-300 ${
+            isOutOfStock
+              ? 'bg-[#e5e2d9] text-[#8a8778] cursor-not-allowed border border-[#d5d0c3]'
+              : isAddingToCart
+                ? 'bg-[#8a8778] text-[#f4f3f0] cursor-wait shadow-md'
+                : 'bg-[#2c2c27] text-[#f4f3f0] hover:bg-[#1a1a17] hover:shadow-lg'
           }`}
-          whileHover={isOutOfStock || isAddingToCart ? {} : { scale: 1.02 }}
+          whileHover={isOutOfStock || isAddingToCart ? {} : { scale: 1.02, y: -1 }}
           whileTap={isOutOfStock || isAddingToCart ? {} : { scale: 0.98 }}
+          animate={isAddingToCart ? { scale: [1, 1.01, 1] } : {}}
+          transition={isAddingToCart ? { duration: 1.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
           aria-label={isOutOfStock ? "Out of stock" : isAddingToCart ? "Adding to cart..." : "Add to cart"}
           disabled={isOutOfStock || isAddingToCart}
         >
           <div className="flex items-center justify-center gap-2">
             {isAddingToCart ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
+                  <Loader2 className="h-4 w-4" />
+                </motion.div>
+                <motion.div
+                  animate={{ opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <span className="text-sm font-medium">Adding to Cart...</span>
+                </motion.div>
+              </>
             ) : (
-              <ShoppingBag className="h-4 w-4" />
+              <>
+                <ShoppingBag className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                </span>
+              </>
             )}
-            <span className="text-sm font-medium">
-              {isOutOfStock ? 'Out of Stock' : isAddingToCart ? 'Adding...' : 'Add to Cart'}
-            </span>
           </div>
         </motion.button>
 

@@ -226,6 +226,7 @@ export default function Home() {
                     material={getMetafield(product, 'custom_material', undefined, product.vendor || 'Premium Fabric')}
                     isNew={true}
                     stockStatus={originalProduct?.stockStatus || "IN_STOCK"}
+                    stockQuantity={originalProduct?.stockQuantity}
                     compareAtPrice={product.compareAtPrice}
                     regularPrice={originalProduct?.regularPrice}
                     salePrice={originalProduct?.salePrice}

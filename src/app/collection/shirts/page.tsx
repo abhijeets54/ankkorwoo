@@ -459,6 +459,7 @@ export default function ShirtsCollectionPage() {
                         material={getMetafield(product, 'custom_material', undefined, 'Premium Fabric')}
                         isNew={true}
                         stockStatus={product._originalWooProduct?.stockStatus || "IN_STOCK"}
+                        stockQuantity={product._originalWooProduct?.stockQuantity}
                         compareAtPrice={product.compareAtPrice}
                         regularPrice={product._originalWooProduct?.regularPrice}
                         salePrice={product._originalWooProduct?.salePrice}

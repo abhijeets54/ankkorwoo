@@ -7,7 +7,7 @@ import { useLocalCartStore } from '@/lib/localCartStore';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart/CartProvider';
 import { Minus, Plus, ShoppingBag } from 'lucide-react';
-import { useProductStockUpdates } from '@/hooks/useStockUpdates';
+import { useSimpleStockUpdates } from '@/hooks/useSimpleStockUpdates';
 
 interface ProductDetailProps {
   product: any;
@@ -42,7 +42,10 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
   } = product;
 
   // Real-time stock updates
-  const { stockData, isConnected } = useProductStockUpdates(databaseId?.toString() || '', true);
+  const stockData = useSimpleStockUpdates(databaseId?.toString() || '', {
+    stockStatus: stockStatus,
+    availableForSale: stockStatus === 'IN_STOCK'
+  });
 
   // Use real-time stock data if available, otherwise fall back to product data
   const currentStockStatus = stockData.stockStatus || stockStatus;
@@ -123,9 +126,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
     }
   };
   
-  // Check if product is out of stock (use real-time data if available)
+  // Enhanced stock management
+  const stockQuantity = currentStockQuantity || product.stockQuantity;
   const isOutOfStock = (currentStockStatus || stockStatus) !== 'IN_STOCK' &&
-                       (currentStockStatus || stockStatus) !== 'instock';
+                       (currentStockStatus || stockStatus) !== 'instock' || 
+                       stockQuantity === 0;
+  const isLowStock = stockQuantity !== undefined && stockQuantity > 0 && stockQuantity <= 5;
   
   // Check if product can be added to cart (has all required attributes selected for variable products)
   const canAddToCart = !isVariableProduct || (isVariableProduct && selectedVariant);
@@ -252,27 +258,34 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
           </div>
           
           {/* Stock Status */}
-          <div className="text-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Availability: </span>
-              <span className={isOutOfStock ? 'text-red-600' : 'text-green-600'}>
-                {isOutOfStock ? 'Out of Stock' : 'In Stock'}
-              </span>
-            </div>
-            {/* Show stock quantity if available */}
-            {currentStockQuantity !== undefined && currentStockQuantity !== null && (
-              <div className="text-xs text-gray-600 mt-1">
-                {currentStockQuantity > 0 ? (
-                  <span>{currentStockQuantity} items available</span>
+          <div className="bg-[#f8f8f5] border border-[#e5e2d9] p-4 rounded-sm">
+            <div className="flex items-center gap-3">
+              <span className="font-medium text-[#2c2c27]">Availability:</span>
+              <div className="flex items-center gap-2">
+                {isOutOfStock ? (
+                  <span className="text-red-600 text-sm font-medium">✗ Out of Stock</span>
+                ) : isLowStock ? (
+                  <span className="text-orange-600 text-sm font-medium">⚠️ Only {stockQuantity} left</span>
+                ) : (currentStockStatus || stockStatus) === 'ON_BACKORDER' ? (
+                  <span className="text-orange-600 text-sm font-medium">⏳ On Backorder</span>
                 ) : (
-                  <span className="text-red-600">No items in stock</span>
+                  <span className="text-green-600 text-sm font-medium">✓ In Stock</span>
                 )}
               </div>
+            </div>
+            
+            {/* Additional stock information for debugging/admin - only show when stock <= 5 */}
+            {stockQuantity !== undefined && stockQuantity !== null && !isLowStock && !isOutOfStock && stockQuantity <= 5 && (
+              <div className="text-xs text-[#8a8778] mt-2">
+                {stockQuantity} items available
+              </div>
             )}
-            {/* Show last update time */}
+            
+            {/* Real-time update indicator */}
             {stockData.lastUpdated && (
-              <div className="text-xs text-gray-500 mt-1">
-                Last updated: {new Date(stockData.lastUpdated).toLocaleTimeString()}
+              <div className="text-xs text-[#8a8778] mt-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                Stock updated: {new Date(stockData.lastUpdated).toLocaleTimeString()}
               </div>
             )}
           </div>
@@ -286,10 +299,21 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
             <Button
               onClick={handleAddToCart}
               disabled={isOutOfStock || isAddingToCart || !canAddToCart}
-              className="w-full py-6 bg-[#2c2c27] text-white hover:bg-[#3c3c37] flex items-center justify-center gap-2"
+              className={`w-full py-6 flex items-center justify-center gap-2 transition-all duration-200 ${
+                isOutOfStock 
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                  : isAddingToCart
+                    ? 'bg-[#8a8778] text-white'
+                    : 'bg-[#2c2c27] text-white hover:bg-[#3c3c37] hover:shadow-md transform hover:-translate-y-0.5'
+              }`}
             >
               <ShoppingBag className="h-5 w-5" />
-              {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+              {isOutOfStock 
+                ? 'Out of Stock' 
+                : isAddingToCart 
+                  ? 'Adding...' 
+                  : 'Add to Cart'
+              }
             </Button>
             
             {isVariableProduct && !canAddToCart && !isOutOfStock && (

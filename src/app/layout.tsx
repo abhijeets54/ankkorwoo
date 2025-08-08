@@ -13,6 +13,7 @@ import StoreHydrationInitializer from "@/components/StoreHydrationInitializer";
 import CartWrapper from "@/components/cart/CartWrapper";
 import NavbarWrapperSSR from "@/components/layout/NavbarWrapperSSR";
 import FooterWrapperSSR from "@/components/layout/FooterWrapperSSR";
+import { StockUpdateProvider } from "@/contexts/StockUpdateContext";
 
 // Serif font for headings
 const playfair = Playfair_Display({
@@ -55,9 +56,10 @@ export default function RootLayout({
         <ToastProvider>
           <AuthProvider>
             <CustomerProvider>
-              <CartProvider>
-                <LoadingProvider>
-                  <LaunchingSoonProvider>
+              <StockUpdateProvider>
+                <CartProvider>
+                  <LoadingProvider>
+                    <LaunchingSoonProvider>
                   <LaunchingStateInitializer />
                   <LaunchUtilsInitializer />
                   <StoreHydrationInitializer />
@@ -67,11 +69,12 @@ export default function RootLayout({
                     {children}
                   </main>
                   <FooterWrapperSSR />
-                  </LaunchingSoonProvider>
-                </LoadingProvider>
-                {/* Cart component - now SSR-safe with skipHydration and proper rehydration */}
-                <CartWrapper />
-              </CartProvider>
+                    </LaunchingSoonProvider>
+                  </LoadingProvider>
+                  {/* Cart component - now SSR-safe with skipHydration and proper rehydration */}
+                  <CartWrapper />
+                </CartProvider>
+              </StockUpdateProvider>
             </CustomerProvider>
           </AuthProvider>
         </ToastProvider>

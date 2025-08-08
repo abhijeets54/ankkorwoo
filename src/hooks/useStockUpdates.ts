@@ -88,14 +88,17 @@ export function useStockUpdates({
       setIsConnected(false);
       setError('Connection to stock updates failed');
       
-      // Only attempt to reconnect if this is still the current connection
-      if (eventSourceRef.current === eventSource) {
+      // Only attempt to reconnect if this is still the current connection and enabled
+      if (eventSourceRef.current === eventSource && enabled) {
         reconnectTimeoutRef.current = setTimeout(() => {
-          if (eventSourceRef.current === eventSource && eventSource.readyState === EventSource.CLOSED) {
+          if (eventSourceRef.current === eventSource && 
+              eventSource.readyState === EventSource.CLOSED && 
+              enabled &&
+              memoizedProductIds.length > 0) {
             console.log('Attempting to reconnect stock updates...');
             connect();
           }
-        }, 5000);
+        }, 10000); // Increased reconnection delay to 10 seconds
       }
     };
 

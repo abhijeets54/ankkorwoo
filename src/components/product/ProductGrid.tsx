@@ -109,6 +109,7 @@ export default function ProductGrid({
               material={product.attributes?.nodes?.find((attr: any) => attr.name === 'Material')?.options?.[0] || ''}
               isNew={product.isNew || false}
               stockStatus={product.stockStatus}
+              stockQuantity={product.stockQuantity}
               compareAtPrice={product.regularPrice !== product.price ? product.regularPrice : null}
               regularPrice={product.regularPrice}
               salePrice={product.salePrice}
