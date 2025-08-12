@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { GraphQLClient, gql } from 'graphql-request';
 import { jwtDecode } from 'jwt-decode';
+// Removed password reset functionality - Face ID authentication replaces forgot password flow
 
 // Auth token cookie name
 const AUTH_COOKIE_NAME = 'woo_auth_token';
@@ -14,6 +15,8 @@ const graphQLClient = new GraphQLClient(endpoint, {
     'Content-Type': 'application/json',
   },
 });
+
+// Resend client removed with password reset functionality
 
 // Make sure the URL has https:// prefix
 if (endpoint && !endpoint.startsWith('http')) {
@@ -69,6 +72,8 @@ const REFRESH_TOKEN_MUTATION = gql`
   }
 `;
 
+// Password reset mutations removed - Face ID authentication replaces this flow
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -83,6 +88,7 @@ export async function POST(request: Request) {
         return handleLogout();
       case 'refresh':
         return handleRefreshToken(data);
+      // Forgot password and reset password cases removed - Face ID authentication replaces this flow
       default:
         return NextResponse.json(
           { success: false, message: 'Invalid action' },
@@ -403,4 +409,6 @@ async function handleRefreshToken({ refreshToken }: { refreshToken?: string }) {
       { status: 500 }
     );
   }
-} 
+}
+
+// Password reset functions removed - Face ID authentication replaces forgot password flow 

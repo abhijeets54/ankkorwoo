@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import * as wooAuth from '@/lib/clientAuth';
 import { useCustomer } from '@/components/providers/CustomerProvider';
+import FaceIDSetup from './FaceIDSetup';
+import FaceIDSignIn from './FaceIDSignIn';
 
 interface AuthFormProps {
   mode: 'login' | 'register';
@@ -31,6 +33,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, redirectUrl = '/' }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [showFaceIDSetup, setShowFaceIDSetup] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState<any>(null);
   
   const isLogin = mode === 'login';
   
@@ -46,6 +50,35 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, redirectUrl = '/' }) => {
   
   // For password confirmation validation
   const password = watch('password', '');
+
+  const handleFaceIDSetupSuccess = () => {
+    // After Face ID setup, redirect to the intended page
+    setTimeout(() => {
+      router.push(redirectUrl);
+      router.refresh();
+    }, 1000);
+  };
+
+  const handleFaceIDSkip = () => {
+    // Skip Face ID setup and redirect
+    router.push(redirectUrl);
+    router.refresh();
+  };
+
+  const handleFaceIDLoginSuccess = async (user: any) => {
+    setSuccess('Face ID authentication successful! Redirecting...');
+    
+    // Refresh customer data to update authentication state
+    setTimeout(async () => {
+      await refreshCustomer();
+      router.push(redirectUrl);
+      router.refresh();
+    }, 500);
+  };
+
+  const handleFaceIDLoginError = (error: string) => {
+    setError(error);
+  };
   
   const onSubmit = async (data: RegisterFormData) => {
     setIsSubmitting(true);
@@ -110,16 +143,21 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, redirectUrl = '/' }) => {
         const result = await response.json();
         
         if (result.success) {
-          setSuccess('Registration successful! Redirecting...');
+          setSuccess('Registration successful!');
 
           // Refresh customer data immediately to update navbar and auth state
           await refreshCustomer();
 
-          // Give browser time to process cookies and state updates
-          setTimeout(() => {
-            router.push(redirectUrl);
-            router.refresh(); // Refresh to update UI based on auth state
-          }, 1000);
+          // Store user data for Face ID setup
+          setRegisteredUser({
+            id: result.customer?.databaseId || result.customer?.id || data.email,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName
+          });
+
+          // Show Face ID setup option
+          setShowFaceIDSetup(true);
         } else {
           setError(result.message || 'Registration failed. Please try again.');
           // Add debug info
@@ -143,6 +181,22 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, redirectUrl = '/' }) => {
     }
   };
   
+  // Show Face ID setup after successful registration
+  if (showFaceIDSetup && registeredUser && !isLogin) {
+    return (
+      <div className="max-w-md mx-auto bg-white p-8 border border-gray-200">
+        <FaceIDSetup
+          userId={registeredUser.id}
+          userEmail={registeredUser.email}
+          userName={`${registeredUser.firstName} ${registeredUser.lastName}`}
+          onSuccess={handleFaceIDSetupSuccess}
+          onSkip={handleFaceIDSkip}
+          isOptional={true}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto bg-white p-8 border border-gray-200">
       <h2 className="text-2xl font-serif mb-6 text-center">
@@ -289,16 +343,26 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, redirectUrl = '/' }) => {
         </button>
       </form>
       
-      {isLogin ? (
-        <div className="mt-4 text-center">
-          <a 
-            href="/forgot-password" 
-            className="text-sm text-[#2c2c27] hover:text-[#8a8778] underline"
-          >
-            Forgot your password?
-          </a>
+      {/* Face ID login option for login mode */}
+      {isLogin && (
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or</span>
+            </div>
+          </div>
+          
+          <div className="mt-6">
+            <FaceIDSignIn
+              onSuccess={handleFaceIDLoginSuccess}
+              onError={handleFaceIDLoginError}
+            />
+          </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 };
