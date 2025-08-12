@@ -7,9 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Package, User, Edit, Fingerprint } from 'lucide-react';
+import { Package, User, Edit } from 'lucide-react';
 import { useCustomer } from '@/components/providers/CustomerProvider';
-import FaceIDManagement from '@/components/auth/FaceIDManagement';
+// Face ID management removed
 
 interface CustomerData {
   id: string;
@@ -254,7 +254,7 @@ const AccountDashboard: React.FC<AccountDashboardProps> = () => {
       </p>
 
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid ${customer.downloadableItems && customer.downloadableItems.nodes.length > 0 ? 'grid-cols-4' : 'grid-cols-3'} mb-8`}>
+        <TabsList className={`grid ${customer.downloadableItems && customer.downloadableItems.nodes.length > 0 ? 'grid-cols-3' : 'grid-cols-2'} mb-8`}>
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -269,10 +269,6 @@ const AccountDashboard: React.FC<AccountDashboardProps> = () => {
               <span className="hidden sm:inline">Downloads</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Fingerprint className="h-4 w-4" />
-            <span className="hidden sm:inline">Face ID</span>
-          </TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}
@@ -658,14 +654,7 @@ const AccountDashboard: React.FC<AccountDashboardProps> = () => {
           </TabsContent>
         )}
 
-        {/* Face ID Security Tab */}
-        <TabsContent value="security">
-          <FaceIDManagement
-            userId={customer.databaseId.toString()}
-            userEmail={customer.email}
-            userName={`${customer.firstName} ${customer.lastName}`}
-          />
-        </TabsContent>
+        {/* Face ID tab removed */}
       </Tabs>
     </motion.div>
   );

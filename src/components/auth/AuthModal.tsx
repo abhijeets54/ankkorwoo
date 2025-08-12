@@ -395,18 +395,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   </p>
                 </div>
                 
-                {/* Additional Links */}
-                {isLogin && (
-                  <div className="mt-4 text-center">
-                    <a 
-                      href="/forgot-password" 
-                      className="text-sm text-[#2c2c27] hover:text-[#3d3d35] underline"
-                      onClick={onClose}
-                    >
-                      Forgot your password?
-                    </a>
-                  </div>
-                )}
+                {/* Forgot password link removed */}
               </div>
             </motion.div>
           </div>
