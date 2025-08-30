@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 import * as wooInventoryMapping from '@/lib/wooInventoryMapping';
-import { webhookSecurity } from '@/lib/webhookSecurity';
+import { webhookSecurity, WebhookSecurityService } from '@/lib/webhookSecurity';
+
 import { prisma } from '@/lib/database';
+
+// Create separate webhook security instance for order webhooks
+const orderWebhookSecurity = new WebhookSecurityService(process.env.WOOCOMMERCE_ORDER_WEBHOOK_SECRET);
 
 // Initialize Redis with fallback handling
 const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -36,8 +40,8 @@ export async function POST(request: NextRequest) {
                      request.headers.get('x-real-ip') || 
                      'unknown';
 
-    // Rate limiting check
-    const rateLimit = webhookSecurity.checkRateLimit(clientIP, 50, 60 * 1000); // Lower limit for order webhooks
+    // Rate limiting check using order webhook security
+    const rateLimit = orderWebhookSecurity.checkRateLimit(clientIP, 50, 60 * 1000); // Lower limit for order webhooks
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Rate limit exceeded', resetTime: rateLimit.resetTime },
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
                      request.headers.get('x-webhook-signature');
 
     if (process.env.NODE_ENV === 'production') {
-      const verificationResult = webhookSecurity.verifySignature(body, signature || '');
+      const verificationResult = orderWebhookSecurity.verifySignature(body, signature || '');
       if (!verificationResult.verified) {
         console.error('Order webhook signature verification failed:', verificationResult.error);
         return NextResponse.json(
