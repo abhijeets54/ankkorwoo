@@ -6,6 +6,21 @@
   "framework": "nextjs",
   "regions": ["iad1"],
   "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-expired-reservations",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-expired-carts", 
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

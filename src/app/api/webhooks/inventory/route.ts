@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 import * as wooInventoryMapping from '@/lib/wooInventoryMapping';
+import { webhookSecurity } from '@/lib/webhookSecurity';
+import { prisma } from '@/lib/database';
 
 // Initialize Redis with fallback handling
 const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -26,19 +28,37 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('=== WooCommerce Webhook Received ===');
+  console.log('=== WooCommerce Inventory Webhook Received ===');
 
   try {
-    // Log all headers for debugging
+    // Get client IP for rate limiting
+    const clientIP = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+
+    // Rate limiting check
+    const rateLimit = webhookSecurity.checkRateLimit(clientIP, 100, 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', resetTime: rateLimit.resetTime },
+        { status: 429 }
+      );
+    }
+
+    // Log all headers for debugging (remove sensitive data in production)
     const headers = Object.fromEntries(request.headers.entries());
-    console.log('Headers:', headers);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Headers:', headers);
+    }
 
     // Get the raw body
     let body: string;
     try {
       body = await request.text();
       console.log('Body received, length:', body.length);
-      console.log('Body preview:', body.substring(0, 200));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Body preview:', body.substring(0, 200));
+      }
     } catch (bodyError) {
       console.error('Error reading request body:', bodyError);
       return NextResponse.json({
@@ -51,6 +71,39 @@ export async function POST(request: NextRequest) {
     if (!body || body.length === 0) {
       console.error('Empty request body received');
       return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+
+    // Webhook signature verification
+    const signature = request.headers.get('x-wc-webhook-signature') || 
+                     request.headers.get('x-woocommerce-webhook-signature') ||
+                     request.headers.get('x-webhook-signature');
+
+    if (process.env.NODE_ENV === 'production') {
+      const verificationResult = webhookSecurity.verifySignature(body, signature || '');
+      if (!verificationResult.verified) {
+        console.error('Webhook signature verification failed:', verificationResult.error);
+        return NextResponse.json(
+          { error: 'Webhook signature verification failed' },
+          { status: 401 }
+        );
+      }
+      console.log('Webhook signature verified successfully');
+    } else {
+      console.log('Skipping signature verification in development mode');
+    }
+
+    // Timestamp validation (prevent replay attacks)
+    const timestamp = request.headers.get('x-wc-webhook-timestamp') ||
+                     request.headers.get('x-webhook-timestamp');
+    
+    if (timestamp && !webhookSecurity.validateTimestamp(timestamp)) {
+      console.warn('Webhook timestamp validation failed - possible replay attack');
+      if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json(
+          { error: 'Invalid or expired timestamp' },
+          { status: 400 }
+        );
+      }
     }
 
     // Parse the webhook data based on content type
@@ -98,8 +151,18 @@ export async function POST(request: NextRequest) {
       stock_quantity: webhookData?.stock_quantity
     });
 
-    // Skip signature verification for now to debug
-    console.log('Skipping signature verification for debugging');
+    // Production security: Ensure signature is verified in all cases
+    if (process.env.NODE_ENV === 'production' && !webhookData.webhook_id) {
+      // For actual product updates (not test pings), signature must be verified
+      const verificationResult = webhookSecurity.verifySignature(body, signature || '');
+      if (!verificationResult.verified) {
+        console.error('Webhook signature verification failed for production request');
+        return NextResponse.json(
+          { error: 'Webhook signature verification required' },
+          { status: 401 }
+        );
+      }
+    }
 
     // Determine webhook type from headers or URL
     const webhookTopic = request.headers.get('x-wc-webhook-topic') || 'product.updated';

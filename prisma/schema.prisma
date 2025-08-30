@@ -1,0 +1,150 @@
+// Prisma schema for production-grade cart persistence
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  firstName   String?
+  lastName    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  carts       Cart[]
+  reservations StockReservation[]
+  
+  @@map("users")
+}
+
+model Cart {
+  id            String      @id @default(cuid())
+  userId        String?     // null for guest carts
+  sessionId     String?     // for guest cart identification
+  status        CartStatus  @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  expiresAt     DateTime?   // for guest cart cleanup
+  convertedAt   DateTime?   // when cart was converted to order
+  
+  // Relationships
+  user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items         CartItem[]
+  
+  // Indexes for performance
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+  // Unique constraints to prevent race conditions
+  @@unique([sessionId, status])
+  @@map("carts")
+}
+
+model CartItem {
+  id            String    @id @default(cuid())
+  cartId        String
+  productId     String
+  variationId   String?
+  quantity      Int
+  price         Decimal   @db.Decimal(10, 2)
+  name          String
+  imageUrl      String?
+  attributes    Json?     // Store product attributes as JSON
+  reservationId String?   // Link to stock reservation
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relationships
+  cart          Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  reservation   StockReservation? @relation(fields: [reservationId], references: [id])
+  
+  // Unique constraint to prevent duplicate items
+  @@unique([cartId, productId, variationId])
+  @@index([productId])
+  @@index([reservationId])
+  @@index([cartId, productId])
+  @@map("cart_items")
+}
+
+model StockReservation {
+  id          String              @id @default(cuid())
+  productId   String
+  variationId String?
+  quantity    Int
+  userId      String?
+  sessionId   String?             // for guest reservations
+  status      ReservationStatus   @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  expiresAt   DateTime
+  confirmedAt DateTime?
+  releasedAt  DateTime?
+  
+  // Relationships
+  user        User?              @relation(fields: [userId], references: [id])
+  cartItems   CartItem[]
+  
+  // Indexes for efficient queries
+  @@index([productId, variationId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("stock_reservations")
+}
+
+model ProductStock {
+  id              String    @id @default(cuid())
+  productId       String
+  variationId     String?
+  totalStock      Int
+  availableStock  Int
+  reservedStock   Int
+  lastSyncAt      DateTime  @default(now())
+  syncSource      String    // 'webhook', 'manual', 'reconciliation'
+  
+  @@unique([productId, variationId])
+  @@index([productId])
+  @@map("product_stocks")
+}
+
+// Audit log for tracking all stock changes
+model StockAuditLog {
+  id          String    @id @default(cuid())
+  productId   String
+  variationId String?
+  changeType  String    // 'reservation_created', 'reservation_confirmed', 'stock_updated', etc.
+  quantity    Int       // positive for increases, negative for decreases
+  previousStock Int
+  newStock    Int
+  reason      String
+  userId      String?
+  sessionId   String?
+  orderId     String?
+  createdAt   DateTime  @default(now())
+  metadata    Json?     // Additional context
+  
+  @@index([productId])
+  @@index([createdAt])
+  @@map("stock_audit_logs")
+}
+
+enum CartStatus {
+  ACTIVE
+  ABANDONED
+  CONVERTED
+  EXPIRED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  EXPIRED
+  CONFIRMED
+  RELEASED
+}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 import * as wooInventoryMapping from '@/lib/wooInventoryMapping';
+import { webhookSecurity } from '@/lib/webhookSecurity';
+import { prisma } from '@/lib/database';
 
 // Initialize Redis with fallback handling
 const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -29,16 +31,28 @@ export async function POST(request: NextRequest) {
   console.log('=== WooCommerce Order Webhook Received ===');
 
   try {
-    // Log all headers for debugging
-    const headers = Object.fromEntries(request.headers.entries());
-    console.log('Headers:', headers);
+    // Get client IP for rate limiting
+    const clientIP = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+
+    // Rate limiting check
+    const rateLimit = webhookSecurity.checkRateLimit(clientIP, 50, 60 * 1000); // Lower limit for order webhooks
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', resetTime: rateLimit.resetTime },
+        { status: 429 }
+      );
+    }
 
     // Get the raw body
     let body: string;
     try {
       body = await request.text();
       console.log('Body received, length:', body.length);
-      console.log('Body preview:', body.substring(0, 200));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Body preview:', body.substring(0, 200));
+      }
     } catch (bodyError) {
       console.error('Error reading request body:', bodyError);
       return NextResponse.json({
@@ -51,6 +65,25 @@ export async function POST(request: NextRequest) {
     if (!body || body.length === 0) {
       console.error('Empty request body received');
       return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+
+    // Webhook signature verification
+    const signature = request.headers.get('x-wc-webhook-signature') || 
+                     request.headers.get('x-woocommerce-webhook-signature') ||
+                     request.headers.get('x-webhook-signature');
+
+    if (process.env.NODE_ENV === 'production') {
+      const verificationResult = webhookSecurity.verifySignature(body, signature || '');
+      if (!verificationResult.verified) {
+        console.error('Order webhook signature verification failed:', verificationResult.error);
+        return NextResponse.json(
+          { error: 'Webhook signature verification failed' },
+          { status: 401 }
+        );
+      }
+      console.log('Order webhook signature verified successfully');
+    } else {
+      console.log('Skipping signature verification in development mode');
     }
 
     // Parse the webhook data based on content type

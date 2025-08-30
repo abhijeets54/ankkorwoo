@@ -1,0 +1,49 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "timeout": 30000,
+  "testDatabase": {
+    "reset": true,
+    "seedData": true
+  },
+  "woocommerce": {
+    "url": "https://maroon-lapwing-781450.hostingersite.com",
+    "consumerKey": "ck_4d17fdf284e132b57f8a5ff57c1a1897473ac27e",
+    "consumerSecret": "cs_bf0f11b174f675ac0a690b15fe0e486302d9d2f3",
+    "webhookSecret": "a7b3c9e2f8d1a6b4c7e0f3a9b2c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a3b6c9"
+  },
+  "redis": {
+    "url": "https://native-drum-5180.upstash.io",
+    "token": "ARQ8AAIjcDE2ZDNiM2Q0NjdiNTM0MzhjYjFmNjZhM2MxMjc1Y2QzNXAxMA"
+  },
+  "testProducts": [
+    {
+      "id": "1",
+      "name": "Test Product 1",
+      "price": 99.99,
+      "stock": 100
+    },
+    {
+      "id": "2",
+      "name": "Test Product 2",
+      "price": 149.99,
+      "stock": 50,
+      "variations": [
+        {
+          "id": "21",
+          "name": "Small",
+          "stock": 20
+        },
+        {
+          "id": "22",
+          "name": "Large", 
+          "stock": 30
+        }
+      ]
+    }
+  ],
+  "loadTest": {
+    "concurrentUsers": 50,
+    "duration": 60,
+    "rampUpTime": 10
+  }
+}
