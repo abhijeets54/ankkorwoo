@@ -2,9 +2,6 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
-// Check if we should use polling instead of SSE (for production/Vercel)
-const USE_POLLING = process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_USE_POLLING === 'true';
-
 interface StockData {
   stockStatus?: string;
   stockQuantity?: number;
@@ -31,12 +28,11 @@ export function useStockUpdateContext() {
 }
 
 interface StockUpdate {
-  type: 'connected' | 'stock_update' | 'heartbeat';
-  productId?: string;
+  type: 'stock_update';
+  productId: string;
   stockStatus?: string;
   stockQuantity?: number;
   availableForSale?: boolean;
-  message?: string;
   timestamp: string;
 }
 
@@ -51,14 +47,6 @@ export function StockUpdateProvider({ children }: { children: React.ReactNode })
   const [stockDataMap, setStockDataMap] = useState<Map<string, StockData>>(new Map());
   const [subscribedProducts, setSubscribedProducts] = useState<Set<string>>(new Set());
   const [isConnected, setIsConnected] = useState(false);
-  
-  // SSE-specific refs
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isConnectingRef = useRef(false);
-  const lastConnectionParamsRef = useRef<string>('');
-  
-  // Polling-specific refs
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isPollingRef = useRef(false);
@@ -83,7 +71,7 @@ export function StockUpdateProvider({ children }: { children: React.ReactNode })
       if (prev.has(productId)) return prev;
       const newSet = new Set(prev);
       newSet.add(productId);
-      console.log('Subscribing to product:', productId);
+      console.log('Subscribing to product (polling):', productId);
       return newSet;
     });
   }, []);
@@ -95,12 +83,11 @@ export function StockUpdateProvider({ children }: { children: React.ReactNode })
       if (!prev.has(productId)) return prev;
       const newSet = new Set(prev);
       newSet.delete(productId);
-      console.log('Unsubscribing from product:', productId);
+      console.log('Unsubscribing from product (polling):', productId);
       return newSet;
     });
   }, []);
 
-  // Polling functions for Vercel compatibility
   const pollForUpdates = useCallback(async () => {
     if (subscribedProducts.size === 0 || isPollingRef.current) {
       return;
@@ -140,15 +127,13 @@ export function StockUpdateProvider({ children }: { children: React.ReactNode })
           console.log(`Received ${data.updates.length} stock updates (polling)`);
           
           for (const update of data.updates) {
-            if (update.type === 'stock_update' && update.productId) {
-              console.log('Stock update received (polling):', update);
-              updateStock(update.productId, {
-                stockStatus: update.stockStatus,
-                stockQuantity: update.stockQuantity,
-                availableForSale: update.availableForSale,
-                lastUpdated: update.timestamp
-              });
-            }
+            console.log('Stock update received (polling):', update);
+            updateStock(update.productId, {
+              stockStatus: update.stockStatus,
+              stockQuantity: update.stockQuantity,
+              availableForSale: update.availableForSale,
+              lastUpdated: update.timestamp
+            });
           }
         }
       } else {
@@ -206,6 +191,8 @@ export function StockUpdateProvider({ children }: { children: React.ReactNode })
   }, [pollForUpdates, subscribedProducts]);
 
   const stopPolling = useCallback(() => {
+    console.log('Stopping stock updates polling');
+    
     // Clear polling timeout
     if (pollTimeoutRef.current) {
       clearTimeout(pollTimeoutRef.current);
@@ -219,135 +206,28 @@ export function StockUpdateProvider({ children }: { children: React.ReactNode })
     }
 
     isPollingRef.current = false;
+    setIsConnected(false);
   }, []);
 
-  const connect = useCallback(() => {
-    // Prevent multiple simultaneous connections
-    if (isConnectingRef.current) {
-      console.log('Connection already in progress, skipping');
-      return;
-    }
-
-    if (subscribedProducts.size === 0) {
-      console.log('No products subscribed, skipping connection');
-      return;
-    }
-
-    // Check if we already have a connection for the same products
-    const currentParams = Array.from(subscribedProducts).sort().join(',');
-    if (eventSourceRef.current && 
-        eventSourceRef.current.readyState === EventSource.OPEN && 
-        lastConnectionParamsRef.current === currentParams) {
-      console.log('Already connected to same products, skipping');
-      return;
-    }
-
-    // Clear any existing connection
-    if (eventSourceRef.current) {
-      console.log('Closing existing connection');
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-
-    // Clear any pending reconnection
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-
-    isConnectingRef.current = true;
-    lastConnectionParamsRef.current = currentParams;
-
-    const params = new URLSearchParams({
-      products: currentParams
-    });
-
-    console.log('Creating stock updates connection for products:', Array.from(subscribedProducts));
-    const eventSource = new EventSource(`/api/stock-updates?${params}`);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onopen = () => {
-      console.log('Stock updates stream connected');
-      setIsConnected(true);
-      isConnectingRef.current = false;
-    };
-
-    eventSource.onmessage = (event) => {
-      try {
-        const update: StockUpdate = JSON.parse(event.data);
-
-        if (update.type === 'stock_update' && update.productId) {
-          console.log('Stock update received:', update);
-          updateStock(update.productId, {
-            stockStatus: update.stockStatus,
-            stockQuantity: update.stockQuantity,
-            availableForSale: update.availableForSale,
-            lastUpdated: update.timestamp
-          });
-        }
-      } catch (parseError) {
-        console.error('Error parsing stock update:', parseError);
-      }
-    };
-
-    eventSource.onerror = (event) => {
-      console.error('Stock updates stream error:', event);
-      setIsConnected(false);
-      isConnectingRef.current = false;
-      
-      // Only attempt to reconnect if this is still the current connection
-      if (eventSourceRef.current === eventSource) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (eventSourceRef.current === eventSource && eventSource.readyState === EventSource.CLOSED) {
-            console.log('Attempting to reconnect stock updates...');
-            connect();
-          }
-        }, 5000);
-      }
-    };
-  }, [subscribedProducts]);
-
-  // Connect/poll when subscribed products change (with debounce)
+  // Start/restart polling when subscribed products change (with debounce)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (USE_POLLING) {
-        console.log('Using polling mode for stock updates');
-        if (subscribedProducts.size > 0) {
-          startPolling();
-        } else {
-          stopPolling();
-        }
+      if (subscribedProducts.size > 0) {
+        startPolling();
       } else {
-        console.log('Using SSE mode for stock updates');
-        connect();
+        stopPolling();
       }
     }, 500); // Debounce to reduce rapid changes
 
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [subscribedProducts, connect, startPolling, stopPolling]);
+  }, [subscribedProducts, startPolling, stopPolling]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Cleanup SSE
-      if (eventSourceRef.current) {
-        console.log('Cleaning up SSE stock updates connection on unmount');
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      
-      isConnectingRef.current = false;
-      
-      // Cleanup polling
       stopPolling();
-      setIsConnected(false);
     };
   }, [stopPolling]);
 
