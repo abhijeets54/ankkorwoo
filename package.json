@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "prisma generate",
     "test-webhooks": "node scripts/test-webhooks.js",
     "setup-woo-sync": "ts-node scripts/setup-woo-sync.ts",
     "validate-woo-migration": "ts-node scripts/validate-woo-migration.ts",
