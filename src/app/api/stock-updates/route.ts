@@ -18,9 +18,13 @@ let activeConnections = 0;
 const MAX_CONNECTIONS = 20; // Increased from 10 but still reasonable
 const connections = new Set<ReadableStreamDefaultController>();
 
-// Connection cleanup interval
-const CONNECTION_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const CONNECTION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+// Connection cleanup interval - reduced for Vercel compatibility
+const CONNECTION_CLEANUP_INTERVAL = 2 * 60 * 1000; // 2 minutes
+const CONNECTION_TIMEOUT = 25 * 1000; // 25 seconds - within Vercel's 30s limit
+
+// Force dynamic rendering to prevent caching
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // Server-Sent Events endpoint for real-time stock updates
 export async function GET(request: NextRequest) {
@@ -208,12 +212,12 @@ export async function GET(request: NextRequest) {
         }
       };
 
-      // Check for updates every 15 seconds (reduced from 20 to be more responsive)
+      // Check for updates every 5 seconds for Vercel compatibility
       let updateInterval: NodeJS.Timeout | null = null;
       if (redis) {
-        // Initial check after 2 seconds
-        setTimeout(checkStockUpdates, 2000);
-        updateInterval = setInterval(checkStockUpdates, 15000);
+        // Initial check after 1 second
+        setTimeout(checkStockUpdates, 1000);
+        updateInterval = setInterval(checkStockUpdates, 5000);
       } else {
         console.log(`Connection ${connectionId}: Redis not available, stock updates polling disabled`);
         // Send notification to client that real-time updates are not available
@@ -228,7 +232,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Send heartbeat every 30 seconds to keep connection alive
+      // Send heartbeat every 10 seconds to keep connection alive
       const heartbeat = setInterval(() => {
         if (isCleanedUp) return;
         
@@ -244,7 +248,7 @@ export async function GET(request: NextRequest) {
           console.log(`Connection ${connectionId}: Heartbeat failed, cleaning up`);
           cleanup();
         }
-      }, 30000);
+      }, 10000);
 
       // Cleanup function
       let isCleanedUp = false;
