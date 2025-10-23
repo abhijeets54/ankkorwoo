@@ -212,7 +212,7 @@ export default function CollectionPage() {
         />
         <div className="absolute inset-0 bg-[#2c2c27] bg-opacity-30 flex items-center justify-center">
           <div className="text-center text-white">
-            <h2 className="text-3xl font-serif font-bold mb-4">Spring/Summer 2025</h2>
+            <h2 className="text-3xl font-serif font-bold mb-4">Ankkor's Exclusive Collection</h2>
             <p className="text-lg max-w-xl mx-auto">Timeless elegance for the modern gentleman</p>
           </div>
         </div>
