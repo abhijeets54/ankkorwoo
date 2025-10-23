@@ -17,11 +17,14 @@ import BannerSlider from '@/components/home/BannerSlider';
 import NewsletterPopup from '@/components/home/NewsletterPopup';
 import LaunchingSoon from '@/components/home/LaunchingSoon';
 import { getCurrencySymbol } from '@/lib/productUtils';
+import { useQuickView } from '@/hooks/useQuickView';
+import QuickViewModal from '@/components/product/QuickViewModal';
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { product: quickViewProduct, isOpen: isQuickViewOpen, openQuickView, closeQuickView } = useQuickView();
   
   // Fetch products from WooCommerce
   useEffect(() => {
@@ -235,6 +238,9 @@ export default function Home() {
                     currencyCode={product.currencyCode || 'INR'}
                     shortDescription={originalProduct?.shortDescription}
                     type={originalProduct?.type}
+                    product={originalProduct}
+                    showSizeSelector={true}
+                    onQuickView={() => openQuickView(originalProduct)}
                   />
                 );
               })}
@@ -523,6 +529,13 @@ export default function Home() {
         </div>
         <div className="absolute bottom-0 right-0 w-full h-px bg-gradient-to-r from-transparent via-[#8a8778] to-transparent opacity-40"></div>
       </motion.section>
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={quickViewProduct}
+        isOpen={isQuickViewOpen}
+        onClose={closeQuickView}
+      />
     </div>
   );
 }

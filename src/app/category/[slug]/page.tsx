@@ -1,55 +1,75 @@
-import React from 'react';
-import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, notFound } from 'next/navigation';
 import { getProducts, getCategories } from '@/lib/woocommerce';
 import ProductGrid from '@/components/product/ProductGrid';
+import ProductCard from '@/components/product/ProductCard';
+import { useQuickView } from '@/hooks/useQuickView';
+import QuickViewModal from '@/components/product/QuickViewModal';
 
-interface CategoryPageProps {
-  params: {
-    slug: string;
-  };
-}
+export default function CategoryPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+  const [category, setCategory] = useState<any>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { product: quickViewProduct, isOpen: isQuickViewOpen, openQuickView, closeQuickView } = useQuickView();
 
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
-  const { slug } = params;
-  
-  // Fetch categories to find the current one
-  const categoriesData = await getCategories();
-  const category = categoriesData.nodes?.find((cat) => cat.slug === slug);
-  
-  if (!category) {
-    return {
-      title: 'Category Not Found | Ankkor',
-      description: 'The requested category could not be found.'
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Fetch categories to find the current one
+        const categoriesData = await getCategories();
+        const foundCategory = categoriesData.nodes?.find((cat: any) => cat.slug === slug);
+
+        if (!foundCategory) {
+          setIsLoading(false);
+          return;
+        }
+
+        setCategory(foundCategory);
+
+        // Fetch products for this category
+        const productsData = await getProducts({
+          first: 12,
+          where: {
+            categoryIn: [foundCategory.slug]
+          }
+        });
+
+        setProducts(productsData.nodes || []);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching category data:', error);
+        setIsLoading(false);
+      }
     };
-  }
-  
-  return {
-    title: `${category.name} | Ankkor`,
-    description: category.description || `Browse our collection of ${category.name.toLowerCase()} products.`
-  };
-}
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const { slug } = params;
-  
-  // Fetch categories to find the current one
-  const categoriesData = await getCategories();
-  const category = categoriesData.nodes?.find((cat) => cat.slug === slug);
-  
-  if (!category) {
-    notFound();
+    fetchData();
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center">
+          <p className="text-[#5c5c52]">Loading...</p>
+        </div>
+      </div>
+    );
   }
-  
-  // Fetch products for this category
-  const productsData = await getProducts({
-    first: 12,
-    where: {
-      categoryIn: [category.slug]
-    }
-  });
-  
-  const products = productsData.nodes || [];
+
+  if (!category) {
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center">
+          <p className="text-[#5c5c52]">Category not found.</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="container mx-auto px-4 py-12">
@@ -68,25 +88,34 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {products.map((product) => (
-            <div key={product.id} className="product-card">
-              {/* You would normally use your ProductCard component here */}
-              <a href={`/product/${product.slug}`} className="block">
-                {product.image && (
-                  <div className="relative aspect-square bg-[#f4f3f0] overflow-hidden mb-4">
-                    <img 
-                      src={product.image.sourceUrl} 
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                <h3 className="text-lg font-medium">{product.name}</h3>
-                <p className="text-gray-600">${parseFloat(product.price).toFixed(2)}</p>
-              </a>
-            </div>
+            <ProductCard
+              key={product.id}
+              id={product.databaseId.toString()}
+              name={product.name}
+              price={product.price || '0'}
+              image={product.image?.sourceUrl || ''}
+              slug={product.slug}
+              stockStatus={product.stockStatus || "IN_STOCK"}
+              stockQuantity={product.stockQuantity}
+              regularPrice={product.regularPrice}
+              salePrice={product.salePrice}
+              onSale={product.onSale || false}
+              shortDescription={product.shortDescription}
+              type={product.type}
+              product={product}
+              showSizeSelector={true}
+              onQuickView={() => openQuickView(product)}
+            />
           ))}
         </div>
       )}
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={quickViewProduct}
+        isOpen={isQuickViewOpen}
+        onClose={closeQuickView}
+      />
     </div>
   );
 } 

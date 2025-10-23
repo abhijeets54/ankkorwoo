@@ -10,6 +10,8 @@ import usePageLoading from '@/hooks/usePageLoading';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import FashionLoader from '@/components/ui/FashionLoader';
+import { useQuickView } from '@/hooks/useQuickView';
+import QuickViewModal from '@/components/product/QuickViewModal';
 
 // Define product type
 interface ProductImage {
@@ -73,7 +75,8 @@ export default function CollectionPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSort, setSelectedSort] = useState('newest');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  
+  const { product: quickViewProduct, isOpen: isQuickViewOpen, openQuickView, closeQuickView } = useQuickView();
+
   // Use the page loading hook
   usePageLoading(isLoading, 'fabric');
   
@@ -444,6 +447,9 @@ export default function CollectionPage() {
                       currencyCode={product.currencyCode || 'INR'}
                       shortDescription={originalProduct?.shortDescription}
                       type={originalProduct?.type}
+                      product={originalProduct}
+                      showSizeSelector={true}
+                      onQuickView={() => openQuickView(originalProduct)}
                     />
                   );
                 } catch (error) {
@@ -463,6 +469,13 @@ export default function CollectionPage() {
           </div>
         </div>
       </div>
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={quickViewProduct}
+        isOpen={isQuickViewOpen}
+        onClose={closeQuickView}
+      />
     </div>
   );
 }

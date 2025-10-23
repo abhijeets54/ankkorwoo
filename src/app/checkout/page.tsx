@@ -11,9 +11,10 @@ import { getCODOrderBreakdown } from '@/lib/codPrepayment';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Truck, CreditCard } from 'lucide-react';
+import { Loader2, Truck, CreditCard, Package } from 'lucide-react';
 import StateCitySelector from '@/components/checkout/StateCitySelector';
 import { getLocationFromPincode } from '@/lib/locationUtils';
+import { CartSizeUtils } from '@/lib/cartSizeUtils';
 
 interface CheckoutFormData {
   firstName: string;
@@ -656,28 +657,88 @@ export default function CheckoutPage() {
             <h2 className="text-xl font-medium mb-4">Order Summary</h2>
 
             <div className="space-y-4">
-              {checkoutStore.cart.map(item => (
-                <div key={item.id} className="flex gap-4 py-2 border-b">
-                  {item.image?.url && (
-                    <div className="relative h-16 w-16 bg-gray-100 flex-shrink-0">
-                      <img
-                        src={item.image.url}
-                        alt={item.name}
-                        className="h-full w-full object-cover rounded"
-                      />
+              {checkoutStore.cart.map(item => {
+                // Extract size information from cart item
+                const sizeInfo = item.attributes?.find(attr => 
+                  ['Size', 'size', 'pa_size', 'product_size'].includes(attr.name)
+                );
+                const otherAttributes = item.attributes?.filter(attr => 
+                  !['Size', 'size', 'pa_size', 'product_size'].includes(attr.name)
+                ) || [];
+
+                return (
+                  <div key={item.id} className="flex gap-4 py-3 border-b border-gray-100 last:border-b-0">
+                    {item.image?.url && (
+                      <div className="relative h-16 w-16 bg-gray-100 flex-shrink-0 rounded-lg overflow-hidden">
+                        <img
+                          src={item.image.url}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                        />
+                        {/* Size badge on image */}
+                        {sizeInfo && (
+                          <div className="absolute -top-1 -right-1 bg-[#2c2c27] text-[#f4f3f0] text-xs px-1.5 py-0.5 rounded-full font-medium">
+                            {CartSizeUtils.formatSizeForDisplay(sizeInfo.value)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                        {item.name}
+                      </h3>
+                      
+                      {/* Other attributes */}
+                      {otherAttributes.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {otherAttributes.map((attr, index) => (
+                            <span key={attr.name}>
+                              {attr.name}: {attr.value}
+                              {index < otherAttributes.length - 1 ? ', ' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-sm text-gray-600">
+                          {(() => {
+                            const priceValue = typeof item.price === 'string'
+                              ? item.price.replace(/[₹$€£,]/g, '').trim()
+                              : String(item.price);
+                            const numPrice = parseFloat(priceValue);
+                            return isNaN(numPrice) ? '₹0.00' : `₹${numPrice.toFixed(2)}`;
+                          })()} × {item.quantity}
+                        </p>
+
+                        {/* Size-specific info */}
+                        {sizeInfo && (
+                          <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                            <span>Size {CartSizeUtils.formatSizeForDisplay(sizeInfo.value)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium">{item.name}</h3>
-                    <p className="text-sm text-gray-600">
-                      ₹{typeof item.price === 'string' ? parseFloat(item.price).toFixed(2) : item.price.toFixed(2)} × {item.quantity}
-                    </p>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-medium text-gray-900">
+                        {(() => {
+                          const priceValue = typeof item.price === 'string'
+                            ? item.price.replace(/[₹$€£,]/g, '').trim()
+                            : String(item.price);
+                          const numPrice = parseFloat(priceValue);
+                          return isNaN(numPrice) ? '₹0.00' : `₹${(numPrice * item.quantity).toFixed(2)}`;
+                        })()}
+                      </div>
+                      {item.quantity > 1 && (
+                        <div className="text-xs text-gray-500">
+                          {item.quantity} items
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    ₹{(typeof item.price === 'string' ? parseFloat(item.price) * item.quantity : item.price * item.quantity).toFixed(2)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="pt-4 space-y-2">
                 <div className="flex justify-between">

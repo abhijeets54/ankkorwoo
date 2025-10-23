@@ -650,6 +650,7 @@ export const QUERY_ALL_PRODUCTS = gql`
         databaseId
         name
         slug
+        type
         description
         shortDescription
         productCategories {
@@ -675,8 +676,20 @@ export const QUERY_ALL_PRODUCTS = gql`
           stockStatus
           variations {
             nodes {
+              id
+              databaseId
+              name
+              price
+              regularPrice
+              salePrice
               stockStatus
               stockQuantity
+              attributes {
+                nodes {
+                  name
+                  value
+                }
+              }
             }
           }
         }
@@ -727,6 +740,7 @@ export const QUERY_CATEGORY_PRODUCTS = gql`
           databaseId
           name
           slug
+          type
           description
           shortDescription
           productCategories {
@@ -752,8 +766,20 @@ export const QUERY_CATEGORY_PRODUCTS = gql`
             stockStatus
             variations {
               nodes {
+                id
+                databaseId
+                name
+                price
+                regularPrice
+                salePrice
                 stockStatus
                 stockQuantity
+                attributes {
+                  nodes {
+                    name
+                    value
+                  }
+                }
               }
             }
           }

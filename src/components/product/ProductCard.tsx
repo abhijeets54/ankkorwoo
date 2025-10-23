@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Loader2 } from 'lucide-react';
+import { Heart, ShoppingBag, Loader2, Eye } from 'lucide-react';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import { useWishlistStore } from '@/lib/store';
 import { useCustomer } from '@/components/providers/CustomerProvider';
@@ -10,6 +10,10 @@ import ImageLoader from '@/components/ui/ImageLoader';
 import { DEFAULT_CURRENCY_SYMBOL, DEFAULT_CURRENCY_CODE } from '@/lib/currency';
 import { toast } from 'react-hot-toast';
 import { useSimpleStockUpdates } from '@/hooks/useSimpleStockUpdates';
+import SizeSelector from './SizeSelector';
+import { SizeAttributeProcessor, ProductSizeInfo } from '@/lib/sizeAttributeProcessor';
+import { WooProduct } from '@/lib/woocommerce';
+import StockBadge from './StockBadge';
 
 // Helper function to clean price for storage
 const cleanPriceForStorage = (price: string | number): string => {
@@ -40,6 +44,13 @@ interface ProductCardProps {
   currencyCode?: string;
   shortDescription?: string;
   type?: string;
+  // Size-related props
+  product?: WooProduct; // Full product data for size processing
+  showSizeSelector?: boolean;
+  defaultSize?: string;
+  onSizeChange?: (size: string) => void;
+  // Quick View prop
+  onQuickView?: () => void;
 }
 
 const ProductCard = ({
@@ -59,9 +70,19 @@ const ProductCard = ({
   currencySymbol = DEFAULT_CURRENCY_SYMBOL,
   currencyCode = DEFAULT_CURRENCY_CODE,
   shortDescription,
-  type
+  type,
+  product,
+  showSizeSelector = true,
+  defaultSize,
+  onSizeChange,
+  onQuickView
 }: ProductCardProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string>(defaultSize || '');
+  const [sizeInfo, setSizeInfo] = useState<ProductSizeInfo | null>(null);
+  const [currentPrice, setCurrentPrice] = useState(price);
+  const [sizeError, setSizeError] = useState<string>('');
+  
   const cart = useLocalCartStore();
   const { openCart } = useCart();
   const { addToWishlist, isInWishlist, removeFromWishlist } = useWishlistStore();
@@ -75,6 +96,59 @@ const ProductCard = ({
     stockQuantity: stockQuantity,
     availableForSale: stockStatus === 'IN_STOCK'
   });
+
+  // Process size information when product data is available
+  useEffect(() => {
+    if (product && showSizeSelector) {
+      console.log('ProductCard: Processing product for sizes:', product.name);
+      console.log('ProductCard: Product data:', {
+        type: product.type,
+        hasAttributes: !!product.attributes,
+        attributesCount: product.attributes?.nodes?.length || 0,
+        attributes: product.attributes?.nodes?.map((a: any) => a.name),
+        hasVariations: !!product.variations,
+        variationsCount: product.variations?.nodes?.length || 0
+      });
+      const extractedSizeInfo = SizeAttributeProcessor.extractSizeAttributes(product);
+      console.log('ProductCard: Extracted size info:', extractedSizeInfo);
+      setSizeInfo(extractedSizeInfo);
+      
+      // Set default size if not already set
+      if (!selectedSize && extractedSizeInfo.defaultSize) {
+        setSelectedSize(extractedSizeInfo.defaultSize);
+        onSizeChange?.(extractedSizeInfo.defaultSize);
+      }
+    } else if (showSizeSelector && !product) {
+      // For testing: create mock size info when no product data
+      console.log('ProductCard: No product data, creating mock sizes for testing');
+      const mockSizeInfo = {
+        productId: id,
+        availableSizes: [
+          { name: 'Size', value: 'S', slug: 's', isAvailable: true, stockQuantity: 10 },
+          { name: 'Size', value: 'M', slug: 'm', isAvailable: true, stockQuantity: 5 },
+          { name: 'Size', value: 'L', slug: 'l', isAvailable: true, stockQuantity: 2 },
+          { name: 'Size', value: 'XL', slug: 'xl', isAvailable: false, stockQuantity: 0 }
+        ],
+        defaultSize: 'S',
+        hasSizes: true
+      };
+      setSizeInfo(mockSizeInfo);
+      if (!selectedSize) {
+        setSelectedSize('S');
+        onSizeChange?.('S');
+      }
+    }
+  }, [product, showSizeSelector, selectedSize, onSizeChange, id]);
+
+  // Update price when size changes
+  useEffect(() => {
+    if (product && selectedSize && sizeInfo?.hasSizes) {
+      const sizePricing = SizeAttributeProcessor.getSizePricing(product, selectedSize);
+      if (sizePricing) {
+        setCurrentPrice(sizePricing.price);
+      }
+    }
+  }, [product, selectedSize, sizeInfo]);
   
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,25 +161,60 @@ const ProductCard = ({
       return;
     }
 
+    // Validate size selection for variable products
+    if (sizeInfo?.hasSizes && !selectedSize) {
+      setSizeError('Please select a size');
+      toast.error('Please select a size before adding to cart');
+      return;
+    }
+
+    // Validate size availability
+    if (sizeInfo?.hasSizes && selectedSize && product) {
+      const validation = SizeAttributeProcessor.validateSizeSelection(product, selectedSize);
+      if (!validation.isValid || !validation.isAvailable) {
+        setSizeError(validation.error || 'Selected size is not available');
+        toast.error(validation.error || 'Selected size is not available');
+        return;
+      }
+    }
+
     if (isAddingToCart) return; // Prevent multiple clicks
 
     setIsAddingToCart(true);
-    console.log(`Adding product to cart: ${name} (ID: ${id})`);
+    setSizeError(''); // Clear any previous errors
+    console.log(`Adding product to cart: ${name} (ID: ${id})${selectedSize ? ` - Size: ${selectedSize}` : ''}`);
 
     try {
+      // Find variation ID if size is selected
+      let variationId: string | undefined;
+      if (product && selectedSize && sizeInfo?.hasSizes) {
+        const variation = SizeAttributeProcessor.findVariationBySize(
+          product.variations?.nodes || [],
+          selectedSize
+        );
+        variationId = variation?.id;
+      }
+
       await cart.addToCart({
         productId: id,
         quantity: 1,
         name: name,
-        price: price,
+        price: currentPrice,
         image: {
           url: image,
           altText: name
-        }
+        },
+        // Add size information to cart item
+        attributes: selectedSize ? [{
+          name: 'Size',
+          value: selectedSize
+        }] : undefined,
+        variationId
       });
 
       // Show success message and open cart
-      toast.success(`${name} added to cart!`);
+      const sizeText = selectedSize ? ` (Size: ${selectedSize})` : '';
+      toast.success(`${name}${sizeText} added to cart!`);
       openCart();
     } catch (error) {
       console.error(`Failed to add ${name} to cart:`, error);
@@ -115,6 +224,12 @@ const ProductCard = ({
     }
   };
   
+  const handleSizeChange = (size: string) => {
+    setSelectedSize(size);
+    setSizeError(''); // Clear any size errors
+    onSizeChange?.(size);
+  };
+
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -126,7 +241,7 @@ const ProductCard = ({
       addToWishlist({
         id,
         name,
-        price: cleanPriceForStorage(price),
+        price: cleanPriceForStorage(currentPrice), // Use current price (may be size-specific)
         image,
         handle: slug,
         material: material || 'Material not specified',
@@ -265,9 +380,9 @@ const ProductCard = ({
                     ? salePrice
                     : `${currencySymbol}${salePrice}`
                 ) : (
-                  price.toString().includes('₹') || price.toString().includes('$') || price.toString().includes('€') || price.toString().includes('£')
-                    ? price
-                    : `${currencySymbol}${price}`
+                  currentPrice.toString().includes('₹') || currentPrice.toString().includes('$') || currentPrice.toString().includes('€') || currentPrice.toString().includes('£')
+                    ? currentPrice
+                    : `${currencySymbol}${currentPrice}`
                 )}
               </p>
 
@@ -290,21 +405,16 @@ const ProductCard = ({
               )}
             </div>
 
-            {/* Stock Status */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {isOutOfStock ? (
-                  <span className="text-red-600 text-xs font-medium">✗ Out of Stock</span>
-                ) : isLowStock ? (
-                  <span className="text-orange-600 text-xs font-medium">⚠️ Only {currentStockQuantity} left</span>
-                ) : currentStockStatus === 'ON_BACKORDER' ? (
-                  <span className="text-orange-600 text-xs font-medium">⏳ Backorder</span>
-                ) : currentStockStatus === 'IN_STOCK' ? (
-                  <span className="text-green-600 text-xs font-medium">✓ In Stock</span>
-                ) : (
-                  <span className="text-gray-600 text-xs font-medium">? Unknown</span>
-                )}
-              </div>
+            {/* Stock Status & Sale Badge */}
+            <div className="flex items-center justify-between gap-2">
+              {/* Live Stock Status from WooCommerce */}
+              <StockBadge
+                stockStatus={currentStockStatus || stockStatus}
+                stockQuantity={currentStockQuantity}
+                variant="compact"
+                showIcon={true}
+                lowStockThreshold={5}
+              />
 
               {/* Sale Badge */}
               {onSale && (
@@ -314,52 +424,28 @@ const ProductCard = ({
               )}
             </div>
           </div>
+
         </div>
       </Link>
 
       {/* Action Buttons - Strip Style */}
       <div className="mt-4 space-y-2">
-        {/* Add to Cart Strip Button */}
+        {/* Quick View Strip Button */}
         <motion.button
-          onClick={handleAddToCart}
-          className={`w-full py-3 px-4 transition-all duration-300 ${
-            isOutOfStock
-              ? 'bg-[#e5e2d9] text-[#8a8778] cursor-not-allowed border border-[#d5d0c3]'
-              : isAddingToCart
-                ? 'bg-[#8a8778] text-[#f4f3f0] cursor-wait shadow-md'
-                : 'bg-[#2c2c27] text-[#f4f3f0] hover:bg-[#1a1a17] hover:shadow-lg'
-          }`}
-          whileHover={isOutOfStock || isAddingToCart ? {} : { scale: 1.02, y: -1 }}
-          whileTap={isOutOfStock || isAddingToCart ? {} : { scale: 0.98 }}
-          animate={isAddingToCart ? { scale: [1, 1.01, 1] } : {}}
-          transition={isAddingToCart ? { duration: 1.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-          aria-label={isOutOfStock ? "Out of stock" : isAddingToCart ? "Adding to cart..." : "Add to cart"}
-          disabled={isOutOfStock || isAddingToCart}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onQuickView?.();
+          }}
+          className="w-full py-3 px-4 bg-[#2c2c27] text-[#f4f3f0] hover:bg-[#1a1a17] hover:shadow-lg transition-all duration-300"
+          whileHover={{ scale: 1.02, y: -1 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.2 }}
+          aria-label="Quick view product"
         >
           <div className="flex items-center justify-center gap-2">
-            {isAddingToCart ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <Loader2 className="h-4 w-4" />
-                </motion.div>
-                <motion.div
-                  animate={{ opacity: [1, 0.7, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                >
-                  <span className="text-sm font-medium">Adding to Cart...</span>
-                </motion.div>
-              </>
-            ) : (
-              <>
-                <ShoppingBag className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-                </span>
-              </>
-            )}
+            <Eye className="h-4 w-4" />
+            <span className="text-sm font-medium">Quick View</span>
           </div>
         </motion.button>
 

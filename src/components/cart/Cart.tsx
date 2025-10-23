@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Minus, ShoppingBag, ArrowRight, CreditCard, AlertTriangle, RefreshCw, WifiOff, Trash2 } from 'lucide-react';
+import { X, Plus, Minus, ShoppingBag, ArrowRight, CreditCard, AlertTriangle, RefreshCw, WifiOff, Trash2, Package } from 'lucide-react';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import type { CartItem } from '@/lib/localCartStore';
 import * as woocommerce from '@/lib/woocommerce';
@@ -19,6 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/components/cart/CartProvider';
 import { cartEvents, notificationEvents } from '@/lib/eventBus';
 import AuthModal from '@/components/auth/AuthModal';
+import { CartSizeUtils, cartSizeHelpers } from '@/lib/cartSizeUtils';
+import SizeAvailabilityIndicator from '@/components/product/SizeAvailabilityIndicator';
 
 // Extended cart item with handle for navigation
 interface ExtendedCartItem extends CartItem {
@@ -414,6 +416,29 @@ const Cart: React.FC = () => {
 
             {/* Cart Footer */}
             <div className="border-t p-4 space-y-4">
+              {/* Cart Summary */}
+              {hasItems && (
+                <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShoppingBag className="h-3 w-3" />
+                    <span className="font-medium">Cart Summary</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span>Items:</span>
+                      <span>{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+                    </div>
+                    {/* Show size breakdown if there are items with sizes */}
+                    {items.some(item => cartSizeHelpers.hasSize(item)) && (
+                      <div className="flex justify-between">
+                        <span>With sizes:</span>
+                        <span>{items.filter(item => cartSizeHelpers.hasSize(item)).length} items</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Subtotal */}
               <div className="flex justify-between font-medium">
                 <span>Subtotal</span>
@@ -516,7 +541,48 @@ interface CartItemProps {
 }
 
 const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCart, formatPrice }) => {
+  const [stockQuantity, setStockQuantity] = useState<number | undefined>(undefined);
+  const [isLoadingStock, setIsLoadingStock] = useState(true);
+
+  // Fetch stock quantity for this cart item
+  useEffect(() => {
+    const fetchStockQuantity = async () => {
+      try {
+        setIsLoadingStock(true);
+
+        // For products with variations (sizes), get the variation stock
+        if (item.variationId) {
+          const product = await woocommerce.getProductById(item.productId);
+          if (product?.variations?.nodes) {
+            const variation = product.variations.nodes.find(
+              (v: any) => v.databaseId?.toString() === item.variationId || v.id === item.variationId
+            );
+            if (variation?.stockQuantity !== undefined) {
+              setStockQuantity(variation.stockQuantity);
+            }
+          }
+        } else {
+          // For simple products, get product stock
+          const product = await woocommerce.getProductById(item.productId);
+          if (product?.stockQuantity !== undefined) {
+            setStockQuantity(product.stockQuantity);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching stock quantity:', error);
+      } finally {
+        setIsLoadingStock(false);
+      }
+    };
+
+    fetchStockQuantity();
+  }, [item.productId, item.variationId]);
+
   const handleIncrement = () => {
+    if (stockQuantity !== undefined && item.quantity >= stockQuantity) {
+      notificationEvents.show(`Only ${stockQuantity} items available in stock`, 'error');
+      return;
+    }
     updateQuantity(item.id, item.quantity + 1);
   };
 
@@ -529,6 +595,10 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
   const handleRemove = () => {
     removeFromCart(item.id);
   };
+
+  // Extract size information
+  const sizeInfo = CartSizeUtils.extractSizeFromCartItem(item);
+  const displayName = CartSizeUtils.createCartItemDisplayName(item);
 
   return (
     <li className="flex gap-4 py-4 border-b">
@@ -544,61 +614,126 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
             priority={false}
           />
         )}
+        
+        {/* Size indicator overlay */}
+        {sizeInfo.hasSize && (
+          <div className="absolute -top-1 -right-1 bg-[#2c2c27] text-[#f4f3f0] text-xs px-1.5 py-0.5 rounded-full font-medium">
+            {sizeInfo.displayName}
+          </div>
+        )}
       </div>
 
       {/* Product Info */}
       <div className="flex-1 flex flex-col">
-        <h4 className="text-sm font-medium line-clamp-2">{item.name}</h4>
+        {/* Product Name with Size */}
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="text-sm font-medium line-clamp-2 flex-1">{item.name}</h4>
+          {sizeInfo.hasSize && (
+            <div className="flex items-center gap-1 text-xs text-[#8a8778] bg-[#f8f8f5] px-2 py-1 rounded-full whitespace-nowrap">
+              <Package className="h-3 w-3" />
+              <span>{sizeInfo.displayName}</span>
+            </div>
+          )}
+        </div>
         
-        {/* Attributes */}
+        {/* Other Attributes (non-size) */}
         {item.attributes && item.attributes.length > 0 && (
           <div className="mt-1 text-xs text-gray-500">
-            {item.attributes.map((attr, index) => (
-              <span key={attr.name}>
-                {attr.name}: {attr.value}
-                {index < item.attributes!.length - 1 ? ', ' : ''}
-              </span>
-            ))}
+            {item.attributes
+              .filter(attr => !['Size', 'size', 'pa_size', 'product_size'].includes(attr.name))
+              .map((attr, index, filteredAttrs) => (
+                <span key={attr.name}>
+                  {attr.name}: {attr.value}
+                  {index < filteredAttrs.length - 1 ? ', ' : ''}
+                </span>
+              ))}
           </div>
         )}
         
-        {/* Price */}
-        <div className="mt-1 text-sm font-medium">
-          {item.price && typeof item.price === 'string' && item.price.toString().includes('₹') 
-            ? item.price 
-            : `${DEFAULT_CURRENCY_SYMBOL}${formatPrice(item.price || '0')}`}
+        {/* Price and Item Total */}
+        <div className="mt-1 flex items-center justify-between">
+          <div className="text-sm font-medium text-[#2c2c27]">
+            {(() => {
+              const priceValue = typeof item.price === 'string'
+                ? item.price.replace(/[₹$€£,]/g, '').trim()
+                : String(item.price);
+              const numPrice = parseFloat(priceValue);
+              return isNaN(numPrice) ? '₹0.00' : `₹${numPrice.toFixed(2)}`;
+            })()}
+            {item.quantity > 1 && (
+              <span className="text-xs text-gray-500 ml-1">each</span>
+            )}
+          </div>
+
+          {/* Item Total */}
+          {item.quantity > 1 && (
+            <div className="text-sm font-semibold text-[#2c2c27]">
+              {(() => {
+                const priceValue = typeof item.price === 'string'
+                  ? item.price.replace(/[₹$€£,]/g, '').trim()
+                  : String(item.price);
+                const numPrice = parseFloat(priceValue);
+                return isNaN(numPrice) ? '₹0.00' : `₹${(numPrice * item.quantity).toFixed(2)}`;
+              })()}
+            </div>
+          )}
         </div>
 
-        {/* Quantity Controls */}
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex items-center border border-gray-300">
+        {/* Quantity Controls and Actions */}
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center border border-gray-300 rounded">
+              <button
+                onClick={handleDecrement}
+                disabled={item.quantity <= 1}
+                className="px-2 py-1 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-l"
+                aria-label="Decrease quantity"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <span className="px-3 py-1 text-sm border-x border-gray-300 bg-gray-50 min-w-[2rem] text-center">
+                {item.quantity}
+              </span>
+              <button
+                onClick={handleIncrement}
+                disabled={stockQuantity !== undefined && item.quantity >= stockQuantity}
+                className="px-2 py-1 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-r"
+                aria-label="Increase quantity"
+                title={stockQuantity !== undefined && item.quantity >= stockQuantity ? `Maximum ${stockQuantity} available` : ''}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Remove Button */}
             <button
-              onClick={handleDecrement}
-              disabled={item.quantity <= 1}
-              className="px-2 py-1 hover:bg-gray-100 disabled:opacity-50"
-              aria-label="Decrease quantity"
+              onClick={handleRemove}
+              className="p-1.5 hover:bg-red-50 hover:text-red-600 rounded-full transition-colors"
+              aria-label={`Remove ${displayName} from cart`}
             >
-              <Minus className="h-3 w-3" />
-            </button>
-            <span className="px-2 py-1 text-sm">{item.quantity}</span>
-            <button
-              onClick={handleIncrement}
-              className="px-2 py-1 hover:bg-gray-100"
-              aria-label="Increase quantity"
-            >
-              <Plus className="h-3 w-3" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
-          
-          {/* Remove Button */}
-          <button
-            onClick={handleRemove}
-            className="p-1 hover:bg-gray-100 rounded-full"
-            aria-label="Remove item"
-          >
-            <Trash2 className="h-4 w-4 text-gray-500" />
-          </button>
+
+          {/* Stock availability message */}
+          {!isLoadingStock && stockQuantity !== undefined && stockQuantity <= 10 && (
+            <div className="text-xs text-orange-600">
+              Only {stockQuantity} available
+            </div>
+          )}
         </div>
+
+        {/* Size-specific availability (if applicable) */}
+        {sizeInfo.hasSize && item.variationId && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-gray-500">Availability:</span>
+            <SizeAvailabilityIndicator
+              stockStatus="in_stock" // This would ideally come from real-time data
+              variant="dot"
+              showTooltip={true}
+            />
+          </div>
+        )}
       </div>
     </li>
   );

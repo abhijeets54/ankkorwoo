@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart/CartProvider';
-import { Minus, Plus, ShoppingBag } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, AlertCircle, Info } from 'lucide-react';
 import { useSimpleStockUpdates } from '@/hooks/useSimpleStockUpdates';
+import SizeSelector from './SizeSelector';
+import { SizeAttributeProcessor, ProductSizeInfo } from '@/lib/sizeAttributeProcessor';
+import { toast } from 'react-hot-toast';
+import StockBadge from './StockBadge';
 
 interface ProductDetailProps {
   product: any;
@@ -19,6 +23,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [sizeInfo, setSizeInfo] = useState<ProductSizeInfo | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<string>('');
+  const [currentRegularPrice, setCurrentRegularPrice] = useState<string>('');
+  const [currentSalePrice, setCurrentSalePrice] = useState<string>('');
+  const [currentOnSale, setCurrentOnSale] = useState<boolean>(false);
+  const [sizeError, setSizeError] = useState<string>('');
   
   const cartStore = useLocalCartStore();
   const { openCart } = useCart();
@@ -53,15 +64,82 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
   
   // Determine if product is a variable product
   const isVariableProduct = type === 'VARIABLE';
+
+  // Process size information
+  useEffect(() => {
+    if (product) {
+      const extractedSizeInfo = SizeAttributeProcessor.extractSizeAttributes(product);
+      setSizeInfo(extractedSizeInfo);
+      
+      // Set default size if available
+      if (extractedSizeInfo.hasSizes && extractedSizeInfo.defaultSize && !selectedSize) {
+        setSelectedSize(extractedSizeInfo.defaultSize);
+      }
+      
+      // Initialize pricing
+      setCurrentPrice(price || '0');
+      setCurrentRegularPrice(regularPrice || '0');
+      setCurrentSalePrice(product.salePrice || '');
+      setCurrentOnSale(onSale || false);
+    }
+  }, [product, price, regularPrice, onSale, selectedSize]);
+
+  // Update pricing when size changes
+  useEffect(() => {
+    if (product && selectedSize && sizeInfo?.hasSizes) {
+      const sizePricing = SizeAttributeProcessor.getSizePricing(product, selectedSize);
+      if (sizePricing) {
+        setCurrentPrice(sizePricing.price);
+        setCurrentRegularPrice(sizePricing.regularPrice);
+        setCurrentSalePrice(sizePricing.salePrice);
+        setCurrentOnSale(sizePricing.onSale);
+      }
+    }
+  }, [product, selectedSize, sizeInfo]);
   
   // Format product images for display
   const productImages = [
     image?.sourceUrl ? { sourceUrl: image.sourceUrl, altText: image.altText || name } : null,
     ...(galleryImages?.nodes || [])
   ].filter(Boolean);
-  
-  // Handle quantity changes
-  const incrementQuantity = () => setQuantity(prev => prev + 1);
+
+  // Enhanced stock management - Define stockQuantity first
+  const stockQuantity = currentStockQuantity || product.stockQuantity;
+  const isOutOfStock = (currentStockStatus || stockStatus) !== 'IN_STOCK' &&
+                       (currentStockStatus || stockStatus) !== 'instock' ||
+                       stockQuantity === 0;
+  const isLowStock = stockQuantity !== undefined && stockQuantity > 0 && stockQuantity <= 5;
+
+  // Get available stock quantity for current selection
+  const getAvailableStock = (): number | undefined => {
+    // For variable products with size selection
+    if (sizeInfo?.hasSizes && selectedSize) {
+      const selectedSizeInfo = sizeInfo.availableSizes.find(s => s.value === selectedSize);
+      return selectedSizeInfo?.stockQuantity;
+    }
+
+    // For variable products with variant selection
+    if (selectedVariant?.stockQuantity !== undefined) {
+      return selectedVariant.stockQuantity;
+    }
+
+    // For simple products
+    return stockQuantity;
+  };
+
+  const availableStock = getAvailableStock();
+
+  // Handle quantity changes with stock validation
+  const incrementQuantity = () => {
+    setQuantity(prev => {
+      if (availableStock !== undefined && prev >= availableStock) {
+        toast.error(`Only ${availableStock} items available in stock`);
+        return prev;
+      }
+      return prev + 1;
+    });
+  };
+
   const decrementQuantity = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
   
   // Handle attribute selection
@@ -100,41 +178,110 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
       }
     }
   };
+
+  // Handle size selection
+  const handleSizeChange = (size: string) => {
+    setSelectedSize(size);
+    setSizeError(''); // Clear any size errors
+    
+    // Update selected attributes for compatibility with existing logic
+    if (sizeInfo?.hasSizes) {
+      const sizeAttributeName = sizeInfo.availableSizes[0]?.name || 'Size';
+      setSelectedAttributes(prev => ({
+        ...prev,
+        [sizeAttributeName]: size
+      }));
+      
+      // Find matching variant
+      if (variations?.nodes) {
+        const matchingVariant = SizeAttributeProcessor.findVariationBySize(
+          variations.nodes,
+          size,
+          sizeAttributeName
+        );
+        setSelectedVariant(matchingVariant);
+      }
+    }
+  };
   
-  // Handle add to cart
+  // Handle add to cart with size validation
   const handleAddToCart = async () => {
+    // Validate size selection for variable products with sizes
+    if (sizeInfo?.hasSizes && !selectedSize) {
+      setSizeError('Please select a size');
+      toast.error('Please select a size before adding to cart');
+      return;
+    }
+
+    // Validate size availability
+    if (sizeInfo?.hasSizes && selectedSize && product) {
+      const validation = SizeAttributeProcessor.validateSizeSelection(product, selectedSize);
+      if (!validation.isValid || !validation.isAvailable) {
+        setSizeError(validation.error || 'Selected size is not available');
+        toast.error(validation.error || 'Selected size is not available');
+        return;
+      }
+    }
+
     setIsAddingToCart(true);
+    setSizeError(''); // Clear any previous errors
     
     try {
+      // Find variation ID if size is selected
+      let variationId: string | undefined;
+      if (selectedSize && sizeInfo?.hasSizes) {
+        const variation = SizeAttributeProcessor.findVariationBySize(
+          variations?.nodes || [],
+          selectedSize
+        );
+        variationId = variation?.id;
+      }
+
       const productToAdd = {
         productId: databaseId.toString(),
         quantity,
         name,
-        price: selectedVariant?.price || price,
+        price: currentPrice || selectedVariant?.price || price,
         image: {
           url: productImages[0]?.sourceUrl || '',
           altText: productImages[0]?.altText || name
-        }
+        },
+        // Add size information to cart item
+        attributes: selectedSize ? [{
+          name: 'Size',
+          value: selectedSize
+        }] : undefined,
+        variationId
       };
       
       await cartStore.addToCart(productToAdd);
+      
+      // Show success message
+      const sizeText = selectedSize ? ` (Size: ${selectedSize})` : '';
+      toast.success(`${name}${sizeText} added to cart!`);
+      
       openCart();
     } catch (error) {
       console.error('Error adding product to cart:', error);
+      toast.error('Failed to add item to cart. Please try again.');
     } finally {
       setIsAddingToCart(false);
     }
   };
-  
-  // Enhanced stock management
-  const stockQuantity = currentStockQuantity || product.stockQuantity;
-  const isOutOfStock = (currentStockStatus || stockStatus) !== 'IN_STOCK' &&
-                       (currentStockStatus || stockStatus) !== 'instock' || 
-                       stockQuantity === 0;
-  const isLowStock = stockQuantity !== undefined && stockQuantity > 0 && stockQuantity <= 5;
-  
+
   // Check if product can be added to cart (has all required attributes selected for variable products)
-  const canAddToCart = !isVariableProduct || (isVariableProduct && selectedVariant);
+  const canAddToCart = (() => {
+    // Simple products can always be added to cart (if in stock)
+    if (!isVariableProduct) return true;
+    
+    // Variable products with sizes need size selection
+    if (sizeInfo?.hasSizes && !selectedSize) return false;
+    
+    // Variable products need all attributes selected (legacy logic)
+    if (isVariableProduct && !selectedVariant && !sizeInfo?.hasSizes) return false;
+    
+    return true;
+  })();
   
   return (
     <div className="container mx-auto px-4 py-12">
@@ -186,9 +333,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
           {/* Price */}
           <div className="flex items-center gap-2">
             <span className="text-xl font-medium text-[#2c2c27]">
-              {(selectedVariant?.price || price).toString().includes('₹') || (selectedVariant?.price || price).toString().includes('$') || (selectedVariant?.price || price).toString().includes('€') || (selectedVariant?.price || price).toString().includes('£')
-                ? (selectedVariant?.price || price)
-                : `₹${selectedVariant?.price || price}`}
+              {currentPrice.toString().includes('₹') || currentPrice.toString().includes('$') || currentPrice.toString().includes('€') || currentPrice.toString().includes('£')
+                ? currentPrice
+                : `₹${currentPrice}`}
             </span>
 
             {onSale && regularPrice && (
@@ -199,6 +346,17 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
               </span>
             )}
           </div>
+
+          {/* Live Stock Status from WooCommerce */}
+          <div>
+            <StockBadge
+              stockStatus={currentStockStatus || stockStatus}
+              stockQuantity={currentStockQuantity}
+              variant="default"
+              showIcon={true}
+              lowStockThreshold={5}
+            />
+          </div>
           
           {/* Short Description */}
           {shortDescription && (
@@ -208,29 +366,54 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
             />
           )}
           
-          {/* Attributes/Variations */}
+          {/* Size Selection */}
+          {sizeInfo?.hasSizes && (
+            <div className="space-y-4">
+              <SizeSelector
+                sizes={sizeInfo.availableSizes}
+                selectedSize={selectedSize}
+                onSizeChange={handleSizeChange}
+                variant="full"
+                showAvailability={true}
+                showPricing={true}
+                aria-label="Select size"
+              />
+              
+              {/* Size Error */}
+              {sizeError && (
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{sizeError}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Other Attributes (non-size) */}
           {isVariableProduct && attributes?.nodes && (
             <div className="space-y-4">
-              {attributes.nodes.map((attribute: any) => (
-                <div key={attribute.name} className="space-y-2">
-                  <h3 className="font-medium text-[#2c2c27]">{attribute.name}</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {attribute.options.map((option: string) => (
-                      <button
-                        key={option}
-                        onClick={() => handleAttributeChange(attribute.name, option)}
-                        className={`px-4 py-2 border ${
-                          selectedAttributes[attribute.name] === option
-                            ? 'border-[#2c2c27] bg-[#2c2c27] text-white'
-                            : 'border-gray-300 hover:border-[#8a8778]'
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    ))}
+              {attributes.nodes
+                .filter((attribute: any) => !['Size', 'size', 'pa_size'].includes(attribute.name))
+                .map((attribute: any) => (
+                  <div key={attribute.name} className="space-y-2">
+                    <h3 className="font-medium text-[#2c2c27]">{attribute.name}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {attribute.options.map((option: string) => (
+                        <button
+                          key={option}
+                          onClick={() => handleAttributeChange(attribute.name, option)}
+                          className={`px-4 py-2 border ${
+                            selectedAttributes[attribute.name] === option
+                              ? 'border-[#2c2c27] bg-[#2c2c27] text-white'
+                              : 'border-gray-300 hover:border-[#8a8778]'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
           
@@ -241,7 +424,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
               <button
                 onClick={decrementQuantity}
                 disabled={quantity <= 1}
-                className="px-3 py-2 hover:bg-gray-100"
+                className="px-3 py-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Decrease quantity"
               >
                 <Minus className="h-4 w-4" />
@@ -249,12 +432,19 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
               <span className="px-4 py-2 border-x border-gray-300">{quantity}</span>
               <button
                 onClick={incrementQuantity}
-                className="px-3 py-2 hover:bg-gray-100"
+                disabled={availableStock !== undefined && quantity >= availableStock}
+                className="px-3 py-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Increase quantity"
+                title={availableStock !== undefined && quantity >= availableStock ? `Maximum ${availableStock} available` : ''}
               >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
+            {availableStock !== undefined && availableStock <= 10 && (
+              <span className="text-xs text-orange-600">
+                Only {availableStock} available
+              </span>
+            )}
           </div>
           
           {/* Stock Status */}
@@ -316,10 +506,35 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
               }
             </Button>
             
-            {isVariableProduct && !canAddToCart && !isOutOfStock && (
-              <p className="mt-2 text-sm text-red-600">
-                Please select all options to add this product to your cart
-              </p>
+            {/* Validation messages */}
+            {!canAddToCart && !isOutOfStock && (
+              <div className="mt-2 space-y-1">
+                {sizeInfo?.hasSizes && !selectedSize && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Please select a size to add this product to your cart</span>
+                  </div>
+                )}
+                {isVariableProduct && !selectedVariant && !sizeInfo?.hasSizes && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Please select all options to add this product to your cart</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Size guide or additional info */}
+            {sizeInfo?.hasSizes && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-sm">
+                <div className="flex items-start gap-2">
+                  <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Size Guide</p>
+                    <p>Need help choosing the right size? Check our size guide for detailed measurements.</p>
+                  </div>
+                </div>
+              </div>
             )}
           </motion.div>
           

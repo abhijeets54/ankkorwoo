@@ -24,7 +24,8 @@
     "test:inventory:health": "node scripts/test-inventory-system.js health",
     "test:forgot-password": "node scripts/test-forgot-password.mjs",
     "test:full-auth": "node scripts/test-full-auth-flow.mjs",
-    "test:resend": "node scripts/test-resend-flow.mjs"
+    "test:resend": "node scripts/test-resend-flow.mjs",
+    "debug:products": "node scripts/debug-product-data.mjs"
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",

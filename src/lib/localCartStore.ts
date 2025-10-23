@@ -10,6 +10,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { CartSizeUtils } from './cartSizeUtils';
 
 // Type definitions
 export interface CartItem {
@@ -211,12 +212,33 @@ export const useLocalCartStore = create<LocalCartStore>()(
             // Don't fail the cart addition if broadcast fails
           }
 
-          // Check if the item already exists in the cart
-          const existingItemIndex = items.findIndex(
-            (cartItem) =>
-              cartItem.productId === normalizedItem.productId &&
-              cartItem.variationId === normalizedItem.variationId
-          );
+          // Check if the item already exists in the cart (including size comparison)
+          const existingItemIndex = items.findIndex((cartItem) => {
+            // Same product ID
+            if (cartItem.productId !== normalizedItem.productId) {
+              return false;
+            }
+
+            // Same variation ID (if any)
+            if (cartItem.variationId !== normalizedItem.variationId) {
+              return false;
+            }
+
+            // Compare attributes (especially size)
+            const cartItemAttrs = cartItem.attributes || [];
+            const newItemAttrs = normalizedItem.attributes || [];
+
+            if (cartItemAttrs.length !== newItemAttrs.length) {
+              return false;
+            }
+
+            // Check if all attributes match
+            return cartItemAttrs.every(cartAttr => 
+              newItemAttrs.some(newAttr => 
+                newAttr.name === cartAttr.name && newAttr.value === cartAttr.value
+              )
+            );
+          });
 
           if (existingItemIndex !== -1) {
             // If item exists, update quantity and reservation
@@ -435,6 +457,50 @@ export const useLocalCartStore = create<LocalCartStore>()(
         // In the future, you could add shipping, tax, etc.
         const calculatedTotal = get().subtotal();
         return isNaN(calculatedTotal) ? 0 : calculatedTotal;
+      },
+
+      // Size-specific helper methods
+      getItemsWithSizeInfo: () => {
+        const items = get().items;
+        return items.map(item => ({
+          ...item,
+          sizeInfo: CartSizeUtils.extractSizeFromCartItem(item),
+          displayName: CartSizeUtils.createCartItemDisplayName(item)
+        }));
+      },
+
+      validateCartForCheckout: () => {
+        const items = get().items;
+        return CartSizeUtils.validateCartForCheckout(items);
+      },
+
+      getProductSizeSummary: (productId: string) => {
+        const items = get().items.filter(item => item.productId === productId);
+        return CartSizeUtils.getProductSizeSummary(items);
+      },
+
+      updateItemSize: (itemId: string, newSize: any, newVariationId?: string, newPrice?: string) => {
+        const items = get().items;
+        const itemIndex = items.findIndex(item => item.id === itemId);
+        
+        if (itemIndex === -1) {
+          throw new Error('Item not found in cart');
+        }
+
+        const updatedItem = CartSizeUtils.updateCartItemSize(
+          items[itemIndex],
+          newSize,
+          newVariationId,
+          newPrice
+        );
+
+        const updatedItems = [...items];
+        updatedItems[itemIndex] = updatedItem;
+
+        set({
+          items: updatedItems,
+          itemCount: updatedItems.reduce((sum, item) => sum + item.quantity, 0)
+        });
       },
 
       // Sync cart with WooCommerce using Store API

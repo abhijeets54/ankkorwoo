@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, X, ShoppingBag, Check, ArrowRight, Trash2 } from 'lucide-react';
+import { Heart, X, ShoppingBag, Check, ArrowRight, Trash2, Minus, Plus } from 'lucide-react';
 import { useWishlistStore } from '@/lib/store';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import { useCustomer } from '@/components/providers/CustomerProvider';
@@ -12,6 +12,8 @@ import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
+import { getProductBySlug } from '@/lib/woocommerce';
+import { SizeAttributeProcessor, ProductSizeInfo } from '@/lib/sizeAttributeProcessor';
 
 // Helper function to safely parse price strings
 const parsePrice = (price: string | number): number => {
@@ -68,6 +70,11 @@ export default function WishlistPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [addedItems, setAddedItems] = useState<Record<string, boolean>>({});
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+  const [productData, setProductData] = useState<Record<string, any>>({});
+  const [sizeInfo, setSizeInfo] = useState<Record<string, ProductSizeInfo>>({});
+  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({});
   
   // Show signup prompt for guest users with items
   useEffect(() => {
@@ -88,6 +95,72 @@ export default function WishlistPage() {
     }
   }, [isAuthenticated, wishlistItems.length, customerLoading]);
   
+  // Fetch product data for each wishlist item
+  useEffect(() => {
+    const fetchProductData = async () => {
+      const newProductData: Record<string, any> = {};
+      const newSizeInfo: Record<string, ProductSizeInfo> = {};
+
+      for (const item of wishlistItems) {
+        if (!productData[item.id] && item.handle) {
+          try {
+            console.log(`Fetching product data for: ${item.handle}`);
+            const product = await getProductBySlug(item.handle);
+            if (product) {
+              newProductData[item.id] = product;
+
+              // Extract size information
+              const extractedSizeInfo = SizeAttributeProcessor.extractSizeAttributes(product);
+              newSizeInfo[item.id] = extractedSizeInfo;
+
+              console.log(`Extracted sizes for ${item.name}:`, extractedSizeInfo);
+            }
+          } catch (error) {
+            console.error(`Error fetching product ${item.handle}:`, error);
+          }
+        }
+      }
+
+      if (Object.keys(newProductData).length > 0) {
+        setProductData(prev => ({ ...prev, ...newProductData }));
+      }
+      if (Object.keys(newSizeInfo).length > 0) {
+        setSizeInfo(prev => ({ ...prev, ...newSizeInfo }));
+      }
+    };
+
+    if (wishlistItems.length > 0) {
+      fetchProductData();
+    }
+  }, [wishlistItems]);
+
+  // Initialize quantities and sizes for each item
+  useEffect(() => {
+    const initialQuantities: Record<string, number> = {};
+    const initialSizes: Record<string, string> = {};
+
+    wishlistItems.forEach(item => {
+      if (!quantities[item.id]) {
+        initialQuantities[item.id] = 1;
+      }
+
+      // Set default size from actual product data
+      if (!selectedSizes[item.id] && sizeInfo[item.id]?.hasSizes) {
+        const defaultSize = sizeInfo[item.id].defaultSize || sizeInfo[item.id].availableSizes[0]?.value;
+        if (defaultSize) {
+          initialSizes[item.id] = defaultSize;
+        }
+      }
+    });
+
+    if (Object.keys(initialQuantities).length > 0) {
+      setQuantities(prev => ({ ...prev, ...initialQuantities }));
+    }
+    if (Object.keys(initialSizes).length > 0) {
+      setSelectedSizes(prev => ({ ...prev, ...initialSizes }));
+    }
+  }, [wishlistItems, sizeInfo]);
+
   // Simulate loading delay
   useEffect(() => {
     if (!customerLoading) {
@@ -99,45 +172,133 @@ export default function WishlistPage() {
     }
   }, [customerLoading]);
 
+  // Get available stock for an item
+  const getAvailableStock = (itemId: string): number | undefined => {
+    const itemSizeInfo = sizeInfo[itemId];
+    const itemSize = selectedSizes[itemId];
 
-  
+    // For variable products with size selection
+    if (itemSizeInfo?.hasSizes && itemSize) {
+      const selectedSizeInfo = itemSizeInfo.availableSizes.find(s => s.value === itemSize);
+      return selectedSizeInfo?.stockQuantity;
+    }
+
+    // For simple products, check if we have product data
+    if (productData[itemId]?.stockQuantity !== undefined) {
+      return productData[itemId].stockQuantity;
+    }
+
+    return undefined;
+  };
+
+  // Quantity handlers with stock validation
+  const incrementQuantity = (itemId: string) => {
+    const availableStock = getAvailableStock(itemId);
+    const currentQuantity = quantities[itemId] || 1;
+
+    if (availableStock !== undefined && currentQuantity >= availableStock) {
+      toast.error(`Only ${availableStock} items available in stock`);
+      return;
+    }
+
+    setQuantities(prev => ({
+      ...prev,
+      [itemId]: currentQuantity + 1
+    }));
+  };
+
+  const decrementQuantity = (itemId: string) => {
+    setQuantities(prev => ({
+      ...prev,
+      [itemId]: Math.max(1, (prev[itemId] || 1) - 1)
+    }));
+  };
+
+  const updateSize = (itemId: string, size: string) => {
+    setSelectedSizes(prev => ({
+      ...prev,
+      [itemId]: size
+    }));
+  };
+
+
+
   // Add item to cart and optionally remove from wishlist
   const handleAddToCart = async (item: typeof wishlistItems[0], removeAfterAdd: boolean = false) => {
+    // Validate size selection for variable products
+    const itemSizeInfo = sizeInfo[item.id];
+    const itemSize = selectedSizes[item.id];
+
+    if (itemSizeInfo?.hasSizes && !itemSize) {
+      toast.error('Please select a size before adding to cart');
+      return;
+    }
+
+    // Validate size availability
+    if (itemSizeInfo?.hasSizes && itemSize && productData[item.id]) {
+      const validation = SizeAttributeProcessor.validateSizeSelection(productData[item.id], itemSize);
+      if (!validation.isValid || !validation.isAvailable) {
+        toast.error(validation.error || 'Selected size is not available');
+        return;
+      }
+    }
+
+    // Set loading state for this specific item
+    setAddingToCart(prev => ({ ...prev, [item.id]: true }));
+
     try {
-      console.log(`Adding item to cart: ${item.name || 'Unnamed Product'}`);
-      
+      const itemQuantity = quantities[item.id] || 1;
+
+      // Find variation ID if size is selected
+      let variationId: string | undefined = item.variantId?.replace('gid://shopify/ProductVariant/', '');
+
+      if (productData[item.id] && itemSize && itemSizeInfo?.hasSizes) {
+        const variation = SizeAttributeProcessor.findVariationBySize(
+          productData[item.id].variations?.nodes || [],
+          itemSize
+        );
+        if (variation?.databaseId) {
+          variationId = variation.databaseId.toString();
+        }
+      }
+
       // Convert wishlist item to cart item format for localCartStore
       const cartItem = {
         productId: item.id,
-        variationId: item.variantId?.replace('gid://shopify/ProductVariant/', '') || undefined, // Extract numeric ID if it's a Shopify GID
-        quantity: 1,
+        variationId: variationId,
+        quantity: itemQuantity,
         name: item.name || 'Unnamed Product',
         price: item.price ? formatPrice(item.price) : '0.00',
         image: item.image ? {
           url: item.image,
           altText: item.name || 'Product image'
-        } : undefined
+        } : undefined,
+        attributes: itemSize ? [{
+          name: 'Size',
+          value: itemSize
+        }] : undefined
       };
-      
+
       await cart.addToCart(cartItem);
-      
-      // On success
-      toast.success(`${item.name || 'Product'} added to your cart!`);
-      
+
+      // Show success message with size info
+      const sizeText = itemSize ? ` (Size: ${itemSize})` : '';
+      toast.success(`${item.name}${sizeText} added to cart!`);
+
       // Show visual feedback
       setAddedItems(prev => ({ ...prev, [item.id]: true }));
-      
+
       // Reset visual feedback after 2 seconds
       setTimeout(() => {
         setAddedItems(prev => ({ ...prev, [item.id]: false }));
       }, 2000);
-      
+
       if (removeAfterAdd) {
         removeFromWishlist(item.id);
       }
     } catch (error) {
       console.error('Error from cart.addToCart:', error);
-      
+
       // Provide specific error message based on the error
       if (error instanceof Error) {
         if (error.message?.includes('out of stock')) {
@@ -150,6 +311,9 @@ export default function WishlistPage() {
       } else {
         toast.error('An unexpected error occurred. Please try again later.');
       }
+    } finally {
+      // Clear loading state
+      setAddingToCart(prev => ({ ...prev, [item.id]: false }));
     }
   };
   
@@ -344,18 +508,93 @@ export default function WishlistPage() {
                       </button>
                     </div>
                     
-                    <div className="p-4">
+                    <div className="p-4 space-y-3">
                       <Link href={`/product/${item.handle || '#'}`}>
                         <h2 className="font-medium text-lg hover:underline">{item.name || 'Unnamed Product'}</h2>
                       </Link>
-                      <p className="text-gray-700 my-2">₹{item.price ? formatPrice(item.price) : '0.00'}</p>
-                      
+                      <p className="text-gray-700">₹{item.price ? formatPrice(item.price) : '0.00'}</p>
+
+                      {/* Size Selector - Only show if product has sizes */}
+                      {sizeInfo[item.id]?.hasSizes && sizeInfo[item.id].availableSizes?.length > 0 ? (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Size</label>
+                          <div className="flex gap-2 flex-wrap">
+                            {sizeInfo[item.id].availableSizes.map((sizeOption) => {
+                              const isAvailable = sizeOption.isAvailable;
+                              const isSelected = selectedSizes[item.id] === sizeOption.value;
+
+                              return (
+                                <button
+                                  key={sizeOption.value}
+                                  onClick={() => isAvailable && updateSize(item.id, sizeOption.value)}
+                                  disabled={!isAvailable}
+                                  className={`px-3 py-1 border rounded text-sm font-medium transition-colors ${
+                                    isSelected
+                                      ? 'bg-[#2c2c27] text-white border-[#2c2c27]'
+                                      : isAvailable
+                                      ? 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                                      : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through'
+                                  }`}
+                                  title={isAvailable ? `Select size ${sizeOption.value}` : `Size ${sizeOption.value} is out of stock`}
+                                >
+                                  {sizeOption.value}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        !sizeInfo[item.id] ? (
+                          <div className="text-sm text-gray-500">Loading sizes...</div>
+                        ) : null
+                      )}
+
+                      {/* Quantity Selector */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                        <div className="space-y-2">
+                          <div className="flex items-center border border-gray-300 rounded w-fit">
+                            <button
+                              onClick={() => decrementQuantity(item.id)}
+                              className="p-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={quantities[item.id] <= 1}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <span className="px-4 py-2 font-medium">{quantities[item.id] || 1}</span>
+                            <button
+                              onClick={() => incrementQuantity(item.id)}
+                              className="p-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={getAvailableStock(item.id) !== undefined && (quantities[item.id] || 1) >= getAvailableStock(item.id)!}
+                              title={getAvailableStock(item.id) !== undefined && (quantities[item.id] || 1) >= getAvailableStock(item.id)! ? `Maximum ${getAvailableStock(item.id)} available` : ''}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {getAvailableStock(item.id) !== undefined && getAvailableStock(item.id)! <= 10 && (
+                            <span className="text-xs text-orange-600">
+                              Only {getAvailableStock(item.id)} available
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
                       <Button
                         onClick={() => handleAddToCart(item)}
-                        className="w-full mt-2 flex items-center justify-center gap-2"
+                        className="w-full flex items-center justify-center gap-2"
+                        disabled={(sizeInfo[item.id]?.hasSizes && !selectedSizes[item.id]) || addingToCart[item.id]}
                       >
-                        <ShoppingBag className="h-4 w-4" />
-                        Add to Cart
+                        {addingToCart[item.id] ? (
+                          <>
+                            <Loader size="sm" color="currentColor" />
+                            <span>Adding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="h-4 w-4" />
+                            {sizeInfo[item.id]?.hasSizes && !selectedSizes[item.id] ? 'Select Size' : 'Add to Cart'}
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -414,8 +653,11 @@ export default function WishlistPage() {
                               className={`${addedItems[item.id] ? 'bg-[#2c2c27] text-[#f4f3f0]' : 'text-[#2c2c27]'} p-2 rounded-full transition-colors hover:text-[#8a8778]`}
                               aria-label="Add to cart"
                               whileTap={{ scale: 0.95 }}
+                              disabled={addingToCart[item.id]}
                             >
-                              {addedItems[item.id] ? (
+                              {addingToCart[item.id] ? (
+                                <Loader size="sm" color="currentColor" />
+                              ) : addedItems[item.id] ? (
                                 <Check className="h-5 w-5" />
                               ) : (
                                 <ShoppingBag className="h-5 w-5" />

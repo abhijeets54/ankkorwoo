@@ -12,6 +12,8 @@ import usePageLoading from '@/hooks/usePageLoading';
 import { getCategoryProducts, normalizeProduct, getMetafield } from '@/lib/woocommerce';
 import { formatPrice, getCurrencySymbol } from '@/lib/productUtils';
 import FashionLoader from '@/components/ui/FashionLoader';
+import { useQuickView } from '@/hooks/useQuickView';
+import QuickViewModal from '@/components/product/QuickViewModal';
 
 // Define product type
 interface ProductImage {
@@ -60,7 +62,8 @@ export default function ShirtsCollectionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
-  
+  const { product: quickViewProduct, isOpen: isQuickViewOpen, openQuickView, closeQuickView } = useQuickView();
+
   // Use the page loading hook
   usePageLoading(isLoading, 'fabric');
   
@@ -468,6 +471,9 @@ export default function ShirtsCollectionPage() {
                         currencyCode={product.currencyCode || 'INR'}
                         shortDescription={product._originalWooProduct?.shortDescription}
                         type={product._originalWooProduct?.type}
+                        product={product._originalWooProduct}
+                        showSizeSelector={true}
+                        onQuickView={() => openQuickView(product._originalWooProduct)}
                       />
                     </motion.div>
                   );
@@ -482,6 +488,13 @@ export default function ShirtsCollectionPage() {
             )}
         </div>
       </div>
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={quickViewProduct}
+        isOpen={isQuickViewOpen}
+        onClose={closeQuickView}
+      />
     </div>
   );
 }

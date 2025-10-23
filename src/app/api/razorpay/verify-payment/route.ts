@@ -123,11 +123,29 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
         postcode: orderData.address.pincode,
         country: 'IN'
       },
-      line_items: orderData.cartItems.map((item: any) => ({
-        product_id: parseInt(item.productId),
-        variation_id: item.variationId ? parseInt(item.variationId) : undefined,
-        quantity: item.quantity
-      })),
+      line_items: orderData.cartItems.map((item: any) => {
+        const lineItem: any = {
+          product_id: parseInt(item.productId),
+          quantity: item.quantity
+        };
+
+        // Add variation_id if present
+        if (item.variationId) {
+          lineItem.variation_id = parseInt(item.variationId);
+        }
+
+        // Add meta_data for attributes (size, etc.) if present
+        if (item.attributes && item.attributes.length > 0) {
+          lineItem.meta_data = item.attributes.map((attr: any) => ({
+            key: attr.name,
+            value: attr.value,
+            display_key: attr.name,
+            display_value: attr.value
+          }));
+        }
+
+        return lineItem;
+      }),
       shipping_lines: [{
         method_id: orderData.shipping.id,
         method_title: orderData.shipping.name,
