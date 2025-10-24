@@ -72,59 +72,44 @@ interface StockValidation {
   stockStatus?: string;
 }
 
-// Validate product stock before adding to cart
+// Validate product stock before adding to cart using centralized validation
 const validateProductStock = async (
   productId: string,
   requestedQuantity: number,
   variationId?: string
 ): Promise<StockValidation> => {
-  // Skip validation in development if API is not ready
-  if (process.env.NODE_ENV === 'development' && !process.env.ENABLE_STOCK_VALIDATION) {
-    console.log('Stock validation skipped in development mode');
-    return { available: true, message: 'Development mode - validation skipped' };
-  }
-
   try {
-    // Check real-time stock from your API
-    const response = await fetch(`/api/products/${productId}/stock${variationId ? `?variation_id=${variationId}` : ''}`);
+    // Use the centralized stock validation function
+    const { validateStockBeforeAddToCart } = await import('./woocommerce');
 
-    if (!response.ok) {
-      console.warn('Stock validation API failed, allowing add to cart');
-      return { available: true, message: 'Stock validation temporarily unavailable' };
-    }
+    const validation = await validateStockBeforeAddToCart({
+      productId,
+      variationId,
+      requestedQuantity
+    });
 
-    const stockData = await response.json();
-
-    // Check if product is in stock
-    if (stockData.stockStatus !== 'IN_STOCK' && stockData.stockStatus !== 'instock') {
+    if (!validation.isValid) {
       return {
         available: false,
-        message: 'This product is currently out of stock',
-        stockStatus: stockData.stockStatus
-      };
-    }
-
-    // Check if requested quantity is available
-    if (stockData.stockQuantity !== null && stockData.stockQuantity < requestedQuantity) {
-      return {
-        available: false,
-        message: `Only ${stockData.stockQuantity} items available in stock`,
-        stockQuantity: stockData.stockQuantity,
-        stockStatus: stockData.stockStatus
+        message: validation.message,
+        stockQuantity: validation.availableStock ?? undefined,
+        stockStatus: validation.availableStock === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK'
       };
     }
 
     return {
       available: true,
-      stockQuantity: stockData.stockQuantity,
-      stockStatus: stockData.stockStatus
+      stockQuantity: validation.availableStock ?? undefined,
+      stockStatus: 'IN_STOCK'
     };
 
   } catch (error) {
     console.error('Stock validation error:', error);
-    // In case of error, allow the add to cart but log the issue
-    console.warn('Stock validation failed, allowing add to cart for better UX');
-    return { available: true, message: 'Stock validation temporarily unavailable' };
+    // In case of error, block add to cart for safety
+    return {
+      available: false,
+      message: 'Unable to verify stock availability. Please try again.'
+    };
   }
 };
 

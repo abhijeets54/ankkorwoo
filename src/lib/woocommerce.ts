@@ -3174,3 +3174,163 @@ export async function updateCart(items: Array<{key: string, quantity: number}>) 
     throw error;
   }
 }
+
+/**
+ * Validate stock availability before adding to cart
+ * Fetches real-time stock data and returns available quantity
+ *
+ * @param productId Product database ID
+ * @param variationId Optional variation database ID for variable products
+ * @param requestedQuantity Quantity user wants to add
+ * @returns Object with validation result and available stock
+ */
+export async function validateStockBeforeAddToCart({
+  productId,
+  variationId,
+  requestedQuantity
+}: {
+  productId: string | number;
+  variationId?: string | number;
+  requestedQuantity: number;
+}): Promise<{
+  isValid: boolean;
+  availableStock: number | null;
+  message?: string;
+  cappedQuantity?: number;
+}> {
+  try {
+    // Validate and transform the product ID
+    const validatedId = await validateProductId(productId.toString());
+
+    // Define the query for stock check
+    const STOCK_CHECK_QUERY = gql`
+      query CheckProductStock($id: ID!) {
+        product(id: $id, idType: DATABASE_ID) {
+          id
+          databaseId
+          name
+          type
+          ... on SimpleProduct {
+            stockStatus
+            stockQuantity
+            manageStock
+          }
+          ... on VariableProduct {
+            stockStatus
+            stockQuantity
+            manageStock
+            variations {
+              nodes {
+                id
+                databaseId
+                stockStatus
+                stockQuantity
+                manageStock
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    // Fetch stock data with no caching for real-time accuracy
+    const data = await fetchFromWooCommerce<{ product: any }>(
+      STOCK_CHECK_QUERY,
+      { id: validatedId },
+      [], // No cache tags
+      0   // No caching - always fetch fresh data
+    );
+
+    if (!data?.product) {
+      return {
+        isValid: false,
+        availableStock: null,
+        message: 'Product not found'
+      };
+    }
+
+    const product = data.product;
+    let stockQuantity: number | null = null;
+    let stockStatus: string = '';
+
+    // Check if this is a variable product with specific variation
+    if (variationId && product.variations?.nodes) {
+      const variation = product.variations.nodes.find(
+        (v: any) => v.databaseId?.toString() === variationId.toString() || v.id === variationId.toString()
+      );
+
+      if (!variation) {
+        return {
+          isValid: false,
+          availableStock: null,
+          message: 'Product variation not found'
+        };
+      }
+
+      stockStatus = variation.stockStatus || '';
+      stockQuantity = variation.stockQuantity;
+
+      // If stock is not managed, check stock status only
+      if (!variation.manageStock) {
+        const isInStock = stockStatus === 'IN_STOCK' || stockStatus === 'instock';
+        return {
+          isValid: isInStock,
+          availableStock: isInStock ? null : 0, // null means unlimited when stock not managed
+          message: isInStock ? undefined : 'This product variation is out of stock'
+        };
+      }
+    } else {
+      // Simple product or variable product without specific variation selected
+      stockStatus = product.stockStatus || '';
+      stockQuantity = product.stockQuantity;
+
+      // If stock is not managed, check stock status only
+      if (!product.manageStock) {
+        const isInStock = stockStatus === 'IN_STOCK' || stockStatus === 'instock';
+        return {
+          isValid: isInStock,
+          availableStock: isInStock ? null : 0, // null means unlimited when stock not managed
+          message: isInStock ? undefined : 'This product is out of stock'
+        };
+      }
+    }
+
+    // Check if product is out of stock
+    const isOutOfStock = stockStatus === 'OUT_OF_STOCK' ||
+                         stockStatus === 'outofstock' ||
+                         stockQuantity === 0;
+
+    if (isOutOfStock) {
+      return {
+        isValid: false,
+        availableStock: 0,
+        message: 'This product is out of stock'
+      };
+    }
+
+    // Check if requested quantity exceeds available stock
+    if (stockQuantity !== null && requestedQuantity > stockQuantity) {
+      return {
+        isValid: false,
+        availableStock: stockQuantity,
+        cappedQuantity: stockQuantity,
+        message: `Only ${stockQuantity} item${stockQuantity !== 1 ? 's' : ''} available in stock`
+      };
+    }
+
+    // Validation passed
+    return {
+      isValid: true,
+      availableStock: stockQuantity,
+      message: undefined
+    };
+
+  } catch (error) {
+    console.error('Error validating stock:', error);
+    return {
+      isValid: false,
+      availableStock: null,
+      message: 'Unable to verify stock availability. Please try again.'
+    };
+  }
+}

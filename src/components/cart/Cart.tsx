@@ -169,11 +169,43 @@ const Cart: React.FC = () => {
     loadProductHandles();
   }, [items, productHandles]);
   
-  // Handle quantity updates
+  // Handle quantity updates with real-time stock validation
   const handleQuantityUpdate = async (id: string, newQuantity: number) => {
     setQuantityUpdateInProgress(true);
 
     try {
+      // Find the cart item to get product and variation info
+      const cartItem = items.find(item => item.id === id);
+      if (!cartItem) {
+        throw new Error('Item not found in cart');
+      }
+
+      // Real-time stock validation before updating quantity
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+
+      const stockValidation = await validateStockBeforeAddToCart({
+        productId: cartItem.productId,
+        variationId: cartItem.variationId,
+        requestedQuantity: newQuantity
+      });
+
+      if (!stockValidation.isValid) {
+        // If stock is insufficient, cap to available quantity
+        if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
+          await updateItem(id, stockValidation.cappedQuantity);
+          notificationEvents.show(
+            stockValidation.message || `Only ${stockValidation.cappedQuantity} items available`,
+            'warning'
+          );
+          cartEvents.itemUpdated(id, stockValidation.cappedQuantity, 'Quantity adjusted to available stock');
+        } else {
+          // Product is completely out of stock
+          notificationEvents.show(stockValidation.message || 'This product is out of stock', 'error');
+        }
+        return;
+      }
+
+      // Stock validation passed, update quantity
       await updateItem(id, newQuantity);
       cartEvents.itemUpdated(id, newQuantity, 'Item quantity updated');
     } catch (error) {
@@ -211,7 +243,7 @@ const Cart: React.FC = () => {
     }
   };
 
-  // Handle checkout process
+  // Handle checkout process with stock validation
   const handleCheckout = async () => {
     setCheckoutLoading(true);
     setCheckoutError(null);
@@ -242,6 +274,69 @@ const Cart: React.FC = () => {
         return;
       }
 
+      // Validate stock for all cart items before proceeding
+      console.log('Validating stock for all cart items before checkout...');
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+
+      const stockIssues: Array<{ item: CartItem; issue: string }> = [];
+
+      for (const item of items) {
+        const stockValidation = await validateStockBeforeAddToCart({
+          productId: item.productId,
+          variationId: item.variationId,
+          requestedQuantity: item.quantity
+        });
+
+        if (!stockValidation.isValid) {
+          stockIssues.push({
+            item,
+            issue: stockValidation.message || 'Stock unavailable'
+          });
+
+          // Auto-adjust quantity if stock is available but less than requested
+          if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
+            await updateItem(item.id, stockValidation.cappedQuantity);
+            notificationEvents.show(
+              `${item.name}: Quantity adjusted to ${stockValidation.cappedQuantity} (only ${stockValidation.cappedQuantity} available)`,
+              'warning'
+            );
+          } else {
+            // Item is completely out of stock
+            notificationEvents.show(
+              `${item.name}: Out of stock and will be removed from cart`,
+              'error'
+            );
+            await removeItem(item.id);
+          }
+        }
+      }
+
+      // If there were stock issues, prevent checkout and show summary
+      if (stockIssues.length > 0) {
+        const outOfStockCount = stockIssues.filter(issue =>
+          issue.issue.toLowerCase().includes('out of stock')
+        ).length;
+
+        const adjustedCount = stockIssues.length - outOfStockCount;
+
+        let errorMessage = 'Some items in your cart have stock issues:\n';
+
+        if (outOfStockCount > 0) {
+          errorMessage += `\n• ${outOfStockCount} item(s) removed (out of stock)`;
+        }
+
+        if (adjustedCount > 0) {
+          errorMessage += `\n• ${adjustedCount} item(s) quantity adjusted to available stock`;
+        }
+
+        errorMessage += '\n\nPlease review your cart and try again.';
+
+        throw new Error(errorMessage);
+      }
+
+      // All stock validations passed
+      console.log('Stock validation passed for all cart items');
+
       // Close the cart drawer first
       toggleCart();
 
@@ -261,7 +356,8 @@ const Cart: React.FC = () => {
       // Display a toast message via events
       notificationEvents.show(
         error instanceof Error ? error.message : 'An error occurred during checkout',
-        'error'
+        'error',
+        5000 // Show for 5 seconds for stock issues
       );
 
       setCheckoutLoading(false);

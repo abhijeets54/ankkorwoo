@@ -117,6 +117,34 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
     setSizeError('');
   };
 
+  // Get available stock quantity for current selection
+  const getAvailableStock = (): number | undefined => {
+    // For variable products with size selection
+    if (sizeInfo?.hasSizes && selectedSize) {
+      const selectedSizeInfo = sizeInfo.availableSizes.find(s => s.value === selectedSize);
+      return selectedSizeInfo?.stockQuantity;
+    }
+
+    // For simple products
+    return currentStockQuantity;
+  };
+
+  const availableStock = getAvailableStock();
+
+  // Handle quantity increment with stock validation
+  const handleIncrementQuantity = () => {
+    if (availableStock !== undefined && quantity >= availableStock) {
+      toast.error(`Only ${availableStock} items available in stock`);
+      return;
+    }
+    setQuantity(quantity + 1);
+  };
+
+  // Handle quantity decrement
+  const handleDecrementQuantity = () => {
+    setQuantity(Math.max(1, quantity - 1));
+  };
+
   const handleAddToCart = async () => {
     // Validate size selection
     if (sizeInfo?.hasSizes && !selectedSize) {
@@ -140,12 +168,36 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
     try {
       // Find variation ID if size is selected
       let variationId: string | undefined;
+      let variationDatabaseId: string | undefined;
       if (isVariableProduct && selectedSize && sizeInfo?.hasSizes) {
         const variation = SizeAttributeProcessor.findVariationBySize(
           variations?.nodes || [],
           selectedSize
         );
         variationId = variation?.id;
+        variationDatabaseId = variation?.databaseId?.toString();
+      }
+
+      // Real-time stock validation before adding to cart
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+
+      const stockValidation = await validateStockBeforeAddToCart({
+        productId: productId,
+        variationId: variationDatabaseId,
+        requestedQuantity: quantity
+      });
+
+      if (!stockValidation.isValid) {
+        toast.error(stockValidation.message || 'This product is out of stock');
+
+        // If there's a capped quantity available, offer to add that amount instead
+        if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
+          setQuantity(stockValidation.cappedQuantity);
+          toast.success(`Quantity adjusted to available stock: ${stockValidation.cappedQuantity}`);
+        }
+
+        setIsAddingToCart(false);
+        return;
       }
 
       await cartStore.addToCart({
@@ -378,7 +430,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
                     <div className="flex items-center gap-4">
                       <div className="flex items-center border border-gray-300 rounded-lg">
                         <button
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          onClick={handleDecrementQuantity}
                           disabled={quantity <= 1}
                           className="p-3 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
@@ -388,12 +440,19 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
                           {quantity}
                         </span>
                         <button
-                          onClick={() => setQuantity(quantity + 1)}
-                          className="p-3 hover:bg-gray-100 transition-colors"
+                          onClick={handleIncrementQuantity}
+                          disabled={availableStock !== undefined && quantity >= availableStock}
+                          className="p-3 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title={availableStock !== undefined && quantity >= availableStock ? `Maximum ${availableStock} available` : ''}
                         >
                           <Plus className="h-4 w-4" />
                         </button>
                       </div>
+                      {availableStock !== undefined && availableStock <= 10 && (
+                        <span className="text-xs text-orange-600">
+                          Only {availableStock} available
+                        </span>
+                      )}
                     </div>
                   </div>
 

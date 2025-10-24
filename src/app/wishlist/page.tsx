@@ -223,7 +223,7 @@ export default function WishlistPage() {
 
 
 
-  // Add item to cart and optionally remove from wishlist
+  // Add item to cart and optionally remove from wishlist with real-time stock validation
   const handleAddToCart = async (item: typeof wishlistItems[0], removeAfterAdd: boolean = false) => {
     // Validate size selection for variable products
     const itemSizeInfo = sizeInfo[item.id];
@@ -251,6 +251,7 @@ export default function WishlistPage() {
 
       // Find variation ID if size is selected
       let variationId: string | undefined = item.variantId?.replace('gid://shopify/ProductVariant/', '');
+      let variationDatabaseId: string | undefined;
 
       if (productData[item.id] && itemSize && itemSizeInfo?.hasSizes) {
         const variation = SizeAttributeProcessor.findVariationBySize(
@@ -259,12 +260,38 @@ export default function WishlistPage() {
         );
         if (variation?.databaseId) {
           variationId = variation.databaseId.toString();
+          variationDatabaseId = variation.databaseId.toString();
         }
+      }
+
+      // Real-time stock validation before adding to cart
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+
+      // Get the database ID from the fetched product data
+      const productDatabaseId = productData[item.id]?.databaseId || item.id;
+
+      const stockValidation = await validateStockBeforeAddToCart({
+        productId: productDatabaseId,
+        variationId: variationDatabaseId,
+        requestedQuantity: itemQuantity
+      });
+
+      if (!stockValidation.isValid) {
+        toast.error(stockValidation.message || 'This product is out of stock');
+
+        // If there's a capped quantity available, offer to add that amount instead
+        if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
+          setQuantities(prev => ({ ...prev, [item.id]: stockValidation.cappedQuantity }));
+          toast.success(`Quantity adjusted to available stock: ${stockValidation.cappedQuantity}`);
+        }
+
+        setAddingToCart(prev => ({ ...prev, [item.id]: false }));
+        return;
       }
 
       // Convert wishlist item to cart item format for localCartStore
       const cartItem = {
-        productId: item.id,
+        productId: productDatabaseId.toString(),
         variationId: variationId,
         quantity: itemQuantity,
         name: item.name || 'Unnamed Product',

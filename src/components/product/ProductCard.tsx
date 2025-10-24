@@ -187,12 +187,29 @@ const ProductCard = ({
     try {
       // Find variation ID if size is selected
       let variationId: string | undefined;
+      let variationDatabaseId: string | undefined;
       if (product && selectedSize && sizeInfo?.hasSizes) {
         const variation = SizeAttributeProcessor.findVariationBySize(
           product.variations?.nodes || [],
           selectedSize
         );
         variationId = variation?.id;
+        variationDatabaseId = variation?.databaseId?.toString();
+      }
+
+      // Real-time stock validation before adding to cart
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+
+      const stockValidation = await validateStockBeforeAddToCart({
+        productId: id,
+        variationId: variationDatabaseId,
+        requestedQuantity: 1
+      });
+
+      if (!stockValidation.isValid) {
+        toast.error(stockValidation.message || 'This product is out of stock');
+        setIsAddingToCart(false);
+        return;
       }
 
       await cart.addToCart({

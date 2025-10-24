@@ -204,7 +204,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
     }
   };
   
-  // Handle add to cart with size validation
+  // Handle add to cart with size validation and real-time stock check
   const handleAddToCart = async () => {
     // Validate size selection for variable products with sizes
     if (sizeInfo?.hasSizes && !selectedSize) {
@@ -225,16 +225,40 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
 
     setIsAddingToCart(true);
     setSizeError(''); // Clear any previous errors
-    
+
     try {
       // Find variation ID if size is selected
       let variationId: string | undefined;
+      let variationDatabaseId: string | undefined;
       if (selectedSize && sizeInfo?.hasSizes) {
         const variation = SizeAttributeProcessor.findVariationBySize(
           variations?.nodes || [],
           selectedSize
         );
         variationId = variation?.id;
+        variationDatabaseId = variation?.databaseId?.toString();
+      }
+
+      // Real-time stock validation before adding to cart
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+
+      const stockValidation = await validateStockBeforeAddToCart({
+        productId: databaseId.toString(),
+        variationId: variationDatabaseId,
+        requestedQuantity: quantity
+      });
+
+      if (!stockValidation.isValid) {
+        toast.error(stockValidation.message || 'This product is out of stock');
+
+        // If there's a capped quantity available, offer to add that amount instead
+        if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
+          setQuantity(stockValidation.cappedQuantity);
+          toast.success(`Quantity adjusted to available stock: ${stockValidation.cappedQuantity}`);
+        }
+
+        setIsAddingToCart(false);
+        return;
       }
 
       const productToAdd = {
@@ -253,13 +277,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product }) => {
         }] : undefined,
         variationId
       };
-      
+
       await cartStore.addToCart(productToAdd);
-      
+
       // Show success message
       const sizeText = selectedSize ? ` (Size: ${selectedSize})` : '';
       toast.success(`${name}${sizeText} added to cart!`);
-      
+
       openCart();
     } catch (error) {
       console.error('Error adding product to cart:', error);
