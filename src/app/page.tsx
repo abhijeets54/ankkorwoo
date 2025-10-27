@@ -322,7 +322,7 @@ export default function Home() {
           >
             <div className="absolute -inset-4 border border-[#8a8778] -z-10 opacity-40"></div>
             <Image
-              src="https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=2944&auto=format&fit=crop"
+              src="/hp.png"
               alt="Ankkor Premium Shirt"
               width={600}
               height={600}
