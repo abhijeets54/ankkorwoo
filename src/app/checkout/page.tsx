@@ -45,10 +45,14 @@ export default function CheckoutPage() {
     register('city', { required: 'City is required' });
   }, [register]);
 
-  // Watch form fields for shipping rate fetching
+  // Watch form fields for shipping rate fetching and button state
   const pincode = watch('pincode');
   const state = watch('state');
   const city = watch('city');
+  const firstName = watch('firstName');
+  const lastName = watch('lastName');
+  const address1 = watch('address1');
+  const phone = watch('phone');
 
   // Memoized handlers to prevent infinite re-renders
   const handleStateChange = useCallback((newState: string) => {
@@ -136,6 +140,25 @@ export default function CheckoutPage() {
   };
 
   const handlePayment = async () => {
+    // Get current form values and save to store before validation
+    const formValues = watch();
+
+    // Ensure shipping address is saved to store from form values
+    if (formValues.firstName && formValues.lastName && formValues.address1 &&
+        formValues.city && formValues.state && formValues.pincode && formValues.phone) {
+      const shippingAddress: ShippingAddress = {
+        firstName: formValues.firstName,
+        lastName: formValues.lastName,
+        address1: formValues.address1,
+        address2: formValues.address2,
+        city: formValues.city,
+        state: formValues.state,
+        pincode: formValues.pincode,
+        phone: formValues.phone,
+      };
+      checkoutStore.setShippingAddress(shippingAddress);
+    }
+
     // Validate all required fields
     if (!checkoutStore.shippingAddress) {
       checkoutStore.setError('Please fill in your shipping address');
@@ -671,7 +694,19 @@ export default function CheckoutPage() {
               <Button
                 onClick={handlePayment}
                 className="w-full py-6 bg-[#2c2c27] hover:bg-[#3c3c37] text-white"
-                disabled={isSubmitting || !checkoutStore.shippingAddress || !checkoutStore.selectedShipping || checkoutStore.isProcessingPayment}
+                disabled={
+                  isSubmitting ||
+                  !firstName ||
+                  !lastName ||
+                  !address1 ||
+                  !city ||
+                  !state ||
+                  !pincode ||
+                  !phone ||
+                  !checkoutStore.selectedShipping ||
+                  checkoutStore.isProcessingPayment ||
+                  Object.keys(errors).length > 0
+                }
               >
                 {isSubmitting || checkoutStore.isProcessingPayment ? (
                   <>
