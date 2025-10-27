@@ -15,14 +15,14 @@ const slides = [
   {
     id: 2,
     image: '/2.webp',
-    text: '100% cotton and trendy colors',
+    text: '100% Cotton and Trendy colors',
     description: 'Experience ultimate comfort and style'
   },
   {
     id: 3,
-    image: '/3.webp',
-    text: 'Feel royal with every buy',
-    description: 'Elevate your wardrobe with our collection'
+    image: '/ab3.png',
+    text: 'Follow us on Instagram',
+    description: '@ankkorindia'
   }
 ];
 
@@ -47,7 +47,7 @@ const BannerSlider = () => {
   };
 
   return (
-    <div className="relative h-[40vh] overflow-hidden">
+    <div className="relative h-[50vh] overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide}

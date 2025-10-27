@@ -161,6 +161,43 @@ export default function CheckoutPage() {
     checkoutStore.setProcessingPayment(true);
     checkoutStore.setError(null);
 
+    // ✅ SECURITY: Validate stock for all cart items before payment
+    try {
+      const { validateStockBeforeAddToCart } = await import('@/lib/woocommerce');
+      const stockIssues: string[] = [];
+
+      for (const item of checkoutStore.cart) {
+        const validation = await validateStockBeforeAddToCart({
+          productId: item.productId,
+          variationId: item.variationId,
+          requestedQuantity: item.quantity
+        });
+
+        if (!validation.isValid) {
+          stockIssues.push(
+            `${item.name}${item.attributes?.length ? ` (${item.attributes.map(a => a.value).join(', ')})` : ''}: ${validation.message || 'Out of stock'}`
+          );
+        }
+      }
+
+      if (stockIssues.length > 0) {
+        setIsSubmitting(false);
+        checkoutStore.setProcessingPayment(false);
+        checkoutStore.setError(
+          `Cannot proceed to payment. Please update your cart:\n\n${stockIssues.join('\n')}`
+        );
+        return;
+      }
+
+      console.log('Stock validation passed for all items');
+    } catch (error: any) {
+      console.error('Stock validation error:', error);
+      setIsSubmitting(false);
+      checkoutStore.setProcessingPayment(false);
+      checkoutStore.setError('Unable to verify stock availability. Please try again.');
+      return;
+    }
+
     try {
       // Validate Razorpay configuration
       const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;

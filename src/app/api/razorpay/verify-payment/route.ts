@@ -54,6 +54,84 @@ export async function POST(request: NextRequest) {
 
     console.log('Payment signature verified successfully');
 
+    // ✅ SECURITY: Verify payment details from Razorpay API
+    const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+
+    if (!razorpayKeyId) {
+      throw new Error('Razorpay key ID not configured');
+    }
+
+    // Initialize Razorpay SDK
+    const Razorpay = require('razorpay');
+    const razorpay = new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    });
+
+    // Fetch payment details from Razorpay
+    let payment;
+    let razorpayOrder;
+
+    try {
+      payment = await razorpay.payments.fetch(razorpay_payment_id);
+      razorpayOrder = await razorpay.orders.fetch(razorpay_order_id);
+    } catch (error: any) {
+      console.error('Error fetching payment/order from Razorpay:', error);
+      return NextResponse.json(
+        { success: false, message: 'Unable to verify payment with gateway' },
+        { status: 500 }
+      );
+    }
+
+    // ✅ SECURITY: Verify payment status
+    if (payment.status !== 'captured' && payment.status !== 'authorized') {
+      console.error('Payment not successful. Status:', payment.status);
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Payment ${payment.status}. Cannot create order.`
+        },
+        { status: 400 }
+      );
+    }
+
+    // ✅ SECURITY: Verify payment belongs to this order
+    if (payment.order_id !== razorpay_order_id) {
+      console.error('Payment order mismatch');
+      return NextResponse.json(
+        { success: false, message: 'Payment order mismatch' },
+        { status: 400 }
+      );
+    }
+
+    // ✅ SECURITY: Verify payment amount matches expected amount
+    const expectedAmount = calculateExpectedAmount(cartItems, shipping);
+    const paidAmount = payment.amount / 100; // Convert paise to rupees
+
+    // Allow 1 rupee tolerance for floating point errors
+    if (Math.abs(paidAmount - expectedAmount) > 1) {
+      console.error('Payment amount mismatch:', {
+        expected: expectedAmount,
+        paid: paidAmount,
+        difference: Math.abs(paidAmount - expectedAmount)
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Payment amount mismatch. Please contact support.'
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log('Payment verification complete:', {
+      payment_id: payment.id,
+      status: payment.status,
+      amount: paidAmount,
+      method: payment.method
+    });
+
     // Create order in WooCommerce
     const orderId = await createWooCommerceOrder({
       address,
@@ -62,7 +140,10 @@ export async function POST(request: NextRequest) {
       paymentDetails: {
         payment_id: razorpay_payment_id,
         order_id: razorpay_order_id,
-        signature: razorpay_signature
+        signature: razorpay_signature,
+        status: payment.status,
+        method: payment.method,
+        amount: paidAmount
       }
     });
 
@@ -208,6 +289,24 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
     console.error('Error creating WooCommerce order:', error);
     throw new Error(`Failed to create order: ${error.message}`);
   }
+}
+
+/**
+ * Calculate expected order amount from cart items and shipping
+ * This prevents price manipulation attacks
+ */
+function calculateExpectedAmount(cartItems: any[], shipping: any): number {
+  const subtotal = cartItems.reduce((total: number, item: any) => {
+    const price = typeof item.price === 'string'
+      ? parseFloat(item.price.replace(/[₹$€£,]/g, '').trim())
+      : item.price;
+    return total + (price * item.quantity);
+  }, 0);
+
+  const shippingCost = shipping.cost || 0;
+  const totalAmount = subtotal + shippingCost;
+
+  return Math.round(totalAmount * 100) / 100; // Round to 2 decimal places
 }
 
 async function sendOrderConfirmationEmail(order: any, address: any): Promise<void> {

@@ -55,6 +55,80 @@ export async function POST(request: NextRequest) {
 
     console.log('COD prepayment signature verified successfully');
 
+    // ✅ SECURITY: Verify payment details from Razorpay API
+    const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+
+    if (!razorpayKeyId) {
+      throw new Error('Razorpay key ID not configured');
+    }
+
+    // Initialize Razorpay SDK
+    const Razorpay = require('razorpay');
+    const razorpay = new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    });
+
+    // Fetch payment details from Razorpay
+    let payment;
+
+    try {
+      payment = await razorpay.payments.fetch(razorpay_payment_id);
+    } catch (error: any) {
+      console.error('Error fetching payment from Razorpay:', error);
+      return NextResponse.json(
+        { success: false, message: 'Unable to verify payment with gateway' },
+        { status: 500 }
+      );
+    }
+
+    // ✅ SECURITY: Verify payment status
+    if (payment.status !== 'captured' && payment.status !== 'authorized') {
+      console.error('COD convenience fee payment not successful. Status:', payment.status);
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Payment ${payment.status}. Cannot create order.`
+        },
+        { status: 400 }
+      );
+    }
+
+    // ✅ SECURITY: Verify payment belongs to this order
+    if (payment.order_id !== razorpay_order_id) {
+      console.error('Payment order mismatch');
+      return NextResponse.json(
+        { success: false, message: 'Payment order mismatch' },
+        { status: 400 }
+      );
+    }
+
+    // ✅ SECURITY: Verify COD convenience fee amount (should be ₹100)
+    const paidAmount = payment.amount / 100; // Convert paise to rupees
+    const expectedFee = 100;
+
+    if (Math.abs(paidAmount - expectedFee) > 0.01) {
+      console.error('COD convenience fee amount mismatch:', {
+        expected: expectedFee,
+        paid: paidAmount
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Convenience fee amount mismatch'
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log('COD convenience fee verification complete:', {
+      payment_id: payment.id,
+      status: payment.status,
+      amount: paidAmount,
+      method: payment.method
+    });
+
     // Create COD order in WooCommerce with special meta data
     const orderId = await createCODWooCommerceOrder({
       address,
@@ -63,7 +137,9 @@ export async function POST(request: NextRequest) {
       paymentDetails: {
         payment_id: razorpay_payment_id,
         order_id: razorpay_order_id,
-        signature: razorpay_signature
+        signature: razorpay_signature,
+        status: payment.status,
+        method: payment.method
       }
     });
 
