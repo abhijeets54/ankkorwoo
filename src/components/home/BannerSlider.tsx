@@ -10,13 +10,13 @@ const slides = [
     id: 1,
     image: '/1.webp',
     text: 'Premium Formal Shirts',
-    description: 'Crafted with precision and elegance'
+    description: 'Crafted with Precision and Elegance'
   },
   {
     id: 2,
     image: '/2.webp',
-    text: '100% Cotton and Trendy colors',
-    description: 'Experience ultimate comfort and style'
+    text: '100% Cotton and Trendy Colors',
+    description: 'Experience Ultimate Comfort and Style'
   },
   {
     id: 3,
