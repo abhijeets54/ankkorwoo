@@ -98,26 +98,56 @@ export default function ProductGrid({
       {/* Products grid */}
       {displayProducts.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {displayProducts.map((product: any) => (
-            <ProductCard
-              key={product.databaseId || product.id}
-              id={product.databaseId?.toString() || product.id}
-              name={product.name}
-              price={product.salePrice || product.price || '0.00'}
-              image={product.image?.sourceUrl || '/placeholder-product.jpg'}
-              slug={product.slug}
-              material={product.attributes?.nodes?.find((attr: any) => attr.name === 'Material')?.options?.[0] || ''}
-              isNew={product.isNew || false}
-              stockStatus={product.stockStatus}
-              stockQuantity={product.stockQuantity}
-              compareAtPrice={product.regularPrice !== product.price ? product.regularPrice : null}
-              regularPrice={product.regularPrice}
-              salePrice={product.salePrice}
-              onSale={product.onSale || false}
-              shortDescription={product.shortDescription}
-              type={product.type}
-            />
-          ))}
+          {displayProducts.map((product: any) => {
+            // Get second image from gallery for hover effect
+            const mainImageUrl = product.image?.sourceUrl;
+            const galleryImages = product.galleryImages?.nodes || [];
+
+            // Debug: Log gallery images for first product
+            if (displayProducts.indexOf(product) === 0) {
+              console.log('🖼️ Product Gallery Debug:', {
+                productName: product.name,
+                mainImage: mainImageUrl,
+                totalGalleryImages: galleryImages.length,
+                galleryImageURLs: galleryImages.map((img: any) => img?.sourceUrl),
+                allImages: [mainImageUrl, ...galleryImages.map((img: any) => img?.sourceUrl)]
+              });
+            }
+
+            // Find the first gallery image that's different from the main image
+            const hoverImage = galleryImages.find(
+              (img: any) => img?.sourceUrl && img.sourceUrl !== mainImageUrl
+            )?.sourceUrl;
+
+            // If no different image found, try just using the first gallery image
+            const finalHoverImage = hoverImage || (galleryImages.length > 0 ? galleryImages[0]?.sourceUrl : null);
+
+            if (displayProducts.indexOf(product) === 0 && finalHoverImage) {
+              console.log('✅ Hover image selected:', finalHoverImage);
+            }
+
+            return (
+              <ProductCard
+                key={product.databaseId || product.id}
+                id={product.databaseId?.toString() || product.id}
+                name={product.name}
+                price={product.salePrice || product.price || '0.00'}
+                image={product.image?.sourceUrl || '/placeholder-product.jpg'}
+                hoverImage={finalHoverImage}
+                slug={product.slug}
+                material={product.attributes?.nodes?.find((attr: any) => attr.name === 'Material')?.options?.[0] || ''}
+                isNew={product.isNew || false}
+                stockStatus={product.stockStatus}
+                stockQuantity={product.stockQuantity}
+                compareAtPrice={product.regularPrice !== product.price ? product.regularPrice : null}
+                regularPrice={product.regularPrice}
+                salePrice={product.salePrice}
+                onSale={product.onSale || false}
+                shortDescription={product.shortDescription}
+                type={product.type}
+              />
+            );
+          })}
         </div>
       )}
       

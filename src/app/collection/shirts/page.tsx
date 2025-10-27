@@ -453,28 +453,48 @@ export default function ShirtsCollectionPage() {
                       exit="exit"
                       layout
                     >
-                      <ProductCard
-                        id={product.id}
-                        name={product.title}
-                        slug={product.handle}
-                        price={product._originalWooProduct?.salePrice || product._originalWooProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
-                        image={product.images[0]?.url || ''}
-                        material={getMetafield(product, 'custom_material', undefined, 'Premium Fabric')}
-                        isNew={true}
-                        stockStatus={product._originalWooProduct?.stockStatus || "IN_STOCK"}
-                        stockQuantity={product._originalWooProduct?.stockQuantity}
-                        compareAtPrice={product.compareAtPrice}
-                        regularPrice={product._originalWooProduct?.regularPrice}
-                        salePrice={product._originalWooProduct?.salePrice}
-                        onSale={product._originalWooProduct?.onSale || false}
-                        currencySymbol={getCurrencySymbol(product.currencyCode)}
-                        currencyCode={product.currencyCode || 'INR'}
-                        shortDescription={product._originalWooProduct?.shortDescription}
-                        type={product._originalWooProduct?.type}
-                        product={product._originalWooProduct}
-                        showSizeSelector={true}
-                        onQuickView={() => openQuickView(product._originalWooProduct)}
-                      />
+                      {(() => {
+                        // Get hover image
+                        const mainImageUrl = product.images[0]?.url;
+                        const productImages = product.images || [];
+                        const galleryImages = product._originalWooProduct?.galleryImages?.nodes || [];
+
+                        // Try to get second image from product.images array first
+                        let hoverImage = productImages[1]?.url;
+
+                        // If not found, find first gallery image different from main image
+                        if (!hoverImage && galleryImages.length > 0) {
+                          hoverImage = galleryImages.find(
+                            (img: any) => img?.sourceUrl && img.sourceUrl !== mainImageUrl
+                          )?.sourceUrl;
+                        }
+
+                        return (
+                          <ProductCard
+                            id={product.id}
+                            name={product.title}
+                            slug={product.handle}
+                            price={product._originalWooProduct?.salePrice || product._originalWooProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
+                            image={product.images[0]?.url || ''}
+                            hoverImage={hoverImage}
+                            material={getMetafield(product, 'custom_material', undefined, 'Premium Fabric')}
+                            isNew={true}
+                            stockStatus={product._originalWooProduct?.stockStatus || "IN_STOCK"}
+                            stockQuantity={product._originalWooProduct?.stockQuantity}
+                            compareAtPrice={product.compareAtPrice}
+                            regularPrice={product._originalWooProduct?.regularPrice}
+                            salePrice={product._originalWooProduct?.salePrice}
+                            onSale={product._originalWooProduct?.onSale || false}
+                            currencySymbol={getCurrencySymbol(product.currencyCode)}
+                            currencyCode={product.currencyCode || 'INR'}
+                            shortDescription={product._originalWooProduct?.shortDescription}
+                            type={product._originalWooProduct?.type}
+                            product={product._originalWooProduct}
+                            showSizeSelector={true}
+                            onQuickView={() => openQuickView(product._originalWooProduct)}
+                          />
+                        );
+                      })()}
                     </motion.div>
                   );
                 })}

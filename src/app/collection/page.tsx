@@ -428,6 +428,22 @@ export default function CollectionPage() {
                   
                   // Return the product card component with the product data
                   const originalProduct = product._originalWooProduct;
+
+                  // Get hover image
+                  const mainImageUrl = product.images[0]?.url;
+                  const productImages = product.images || [];
+                  const galleryImages = originalProduct?.galleryImages?.nodes || [];
+
+                  // Try to get second image from product.images array first
+                  let hoverImage = productImages[1]?.url;
+
+                  // If not found, find first gallery image different from main image
+                  if (!hoverImage && galleryImages.length > 0) {
+                    hoverImage = galleryImages.find(
+                      (img: any) => img?.sourceUrl && img.sourceUrl !== mainImageUrl
+                    )?.sourceUrl;
+                  }
+
                   return (
                     <ProductCard
                       key={product.id}
@@ -436,6 +452,7 @@ export default function CollectionPage() {
                       slug={product.handle}
                       price={originalProduct?.salePrice || originalProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
                       image={product.images[0]?.url || ''}
+                      hoverImage={hoverImage}
                       isNew={true}
                       stockStatus={originalProduct?.stockStatus || "IN_STOCK"}
                       stockQuantity={originalProduct?.stockQuantity}

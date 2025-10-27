@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, Loader2, Eye } from 'lucide-react';
 import { useLocalCartStore } from '@/lib/localCartStore';
@@ -51,6 +52,8 @@ interface ProductCardProps {
   onSizeChange?: (size: string) => void;
   // Quick View prop
   onQuickView?: () => void;
+  // Hover image
+  hoverImage?: string;
 }
 
 const ProductCard = ({
@@ -75,20 +78,47 @@ const ProductCard = ({
   showSizeSelector = true,
   defaultSize,
   onSizeChange,
-  onQuickView
+  onQuickView,
+  hoverImage
 }: ProductCardProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>(defaultSize || '');
   const [sizeInfo, setSizeInfo] = useState<ProductSizeInfo | null>(null);
   const [currentPrice, setCurrentPrice] = useState(price);
   const [sizeError, setSizeError] = useState<string>('');
-  
+  const [isHovering, setIsHovering] = useState(false);
+  const [hoverImageLoaded, setHoverImageLoaded] = useState(false);
+
   const cart = useLocalCartStore();
   const { openCart } = useCart();
   const { addToWishlist, isInWishlist, removeFromWishlist } = useWishlistStore();
   const { isAuthenticated } = useCustomer();
 
   const inWishlist = isInWishlist(id);
+
+  // Debug and preload hover image
+  useEffect(() => {
+    if (hoverImage) {
+      console.log('ProductCard hover image detected:', {
+        productName: name,
+        mainImage: image,
+        hoverImage: hoverImage
+      });
+
+      // Preload the hover image using native browser Image constructor
+      if (typeof window !== 'undefined') {
+        const img = window.Image ? new window.Image() : document.createElement('img');
+        img.src = hoverImage;
+        img.onload = () => {
+          console.log('Hover image loaded successfully:', hoverImage);
+          setHoverImageLoaded(true);
+        };
+        img.onerror = () => {
+          console.error('Failed to load hover image:', hoverImage);
+        };
+      }
+    }
+  }, [hoverImage, image, name]);
   
   // Use real-time stock updates
   const realtimeStockData = useSimpleStockUpdates(id, {
@@ -292,17 +322,50 @@ const ProductCard = ({
       transition={{ duration: 0.3 }}
     >
       <Link href={`/product/${slug}`} className="block">
-        <div className="relative overflow-hidden mb-4">
+        <div
+          className="relative overflow-hidden mb-4"
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+        >
           {/* Product Image */}
           <div className="aspect-[3/4] relative bg-[#f4f3f0] overflow-hidden">
-            <ImageLoader
+            {/* Main Image */}
+            <Image
               src={image}
               alt={name}
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              animate={true}
-              className="h-full"
+              className={`object-cover transition-opacity duration-500 ease-in-out ${
+                isHovering && hoverImage && hoverImageLoaded ? 'opacity-0' : 'opacity-100'
+              }`}
+              style={{ zIndex: isHovering && hoverImage ? 1 : 2 }}
+              priority={false}
             />
+
+            {/* Hover Image (Second Image) - Preloaded */}
+            {hoverImage && (
+              <Image
+                src={hoverImage}
+                alt={`${name} - alternate view`}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className={`object-cover transition-opacity duration-500 ease-in-out ${
+                  isHovering && hoverImageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{
+                  zIndex: isHovering ? 2 : 1,
+                  pointerEvents: 'none'
+                }}
+                priority={false}
+                onLoadingComplete={() => {
+                  console.log('✅ Hover image loaded:', hoverImage);
+                  setHoverImageLoaded(true);
+                }}
+                onError={() => {
+                  console.error('❌ Failed to load hover image:', hoverImage);
+                }}
+              />
+            )}
           </div>
 
           {/* Quick Actions */}

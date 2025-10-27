@@ -218,6 +218,21 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {featuredProducts.map((product) => {
                 const originalProduct = product._originalWooProduct;
+                // Get second image for hover effect
+                const mainImageUrl = product.images[0]?.url;
+                const productImages = product.images || [];
+                const galleryImages = originalProduct?.galleryImages?.nodes || [];
+
+                // Try to get second image from product.images array first
+                let hoverImage = productImages[1]?.url;
+
+                // If not found, find first gallery image different from main image
+                if (!hoverImage && galleryImages.length > 0) {
+                  hoverImage = galleryImages.find(
+                    (img: any) => img?.sourceUrl && img.sourceUrl !== mainImageUrl
+                  )?.sourceUrl;
+                }
+
                 return (
                   <ProductCard
                     key={product.id}
@@ -225,6 +240,7 @@ export default function Home() {
                     name={product.title}
                     price={originalProduct?.salePrice || originalProduct?.price || product.priceRange?.minVariantPrice?.amount || '0'}
                     image={product.images[0]?.url || ''}
+                    hoverImage={hoverImage}
                     slug={product.handle}
                     material={getMetafield(product, 'custom_material', undefined, product.vendor || 'Premium Fabric')}
                     isNew={true}
