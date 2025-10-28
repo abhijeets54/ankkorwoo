@@ -733,7 +733,11 @@ export default function CheckoutPage() {
                 <p className="text-sm text-red-500 mt-2">Invalid discount code</p>
               )}
               {checkoutStore.isDiscountValid && (
-                <p className="text-sm text-green-600 mt-2">Discount applied successfully!</p>
+                <p className="text-sm text-green-600 mt-2">
+                  {checkoutStore.discountCode.toUpperCase() === 'ANKKOR10' 
+                    ? '10% discount applied successfully!' 
+                    : '99% discount applied successfully!'}
+                </p>
               )}
             </div>
           )}
@@ -969,7 +973,7 @@ export default function CheckoutPage() {
                 </div>
                 {checkoutStore.isDiscountValid && (
                   <div className="flex justify-between text-green-600">
-                    <span>Discount (10% off)</span>
+                    <span>Discount</span>
                     <span>-₹{checkoutStore.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
