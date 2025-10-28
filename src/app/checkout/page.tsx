@@ -673,36 +673,70 @@ export default function CheckoutPage() {
           </div>
 
           {/* Discount Code Section */}
-          <div className="bg-white p-6 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-medium mb-4 flex items-center">
-              <Package className="mr-2 h-5 w-5" />
-              Discount Code
-            </h2>
-            
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="Enter discount code"
-                value={checkoutStore.discountCode}
-                onChange={(e) => checkoutStore.setDiscountCode(e.target.value)}
-                className="flex-1"
-              />
-              <Button 
-                onClick={() => checkoutStore.applyDiscount()}
-                variant="outline"
-                type="button"
-              >
-                Apply
-              </Button>
+          {checkoutStore.cart.length > 0 && (
+            <div className="bg-white p-6 border rounded-lg shadow-sm">
+              <h2 className="text-xl font-medium mb-4 flex items-center">
+                <Package className="mr-2 h-5 w-5" />
+                Discount Code
+              </h2>
+              
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder={
+                    !state 
+                      ? "First select state and calculate shipping"
+                      : checkoutStore.isLoadingShipping
+                      ? "Calculating shipping..."
+                      : !firstName || !lastName || !email || !address1 || !city || !pincode || !phone
+                      ? "Fill shipping details first"
+                      : "Enter discount code"
+                  }
+                  value={checkoutStore.discountCode}
+                  onChange={(e) => checkoutStore.setDiscountCode(e.target.value)}
+                  disabled={
+                    !firstName ||
+                    !lastName ||
+                    !email ||
+                    !address1 ||
+                    !city ||
+                    !state ||
+                    !pincode ||
+                    !phone ||
+                    checkoutStore.isLoadingShipping
+                  }
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={() => checkoutStore.applyDiscount()}
+                  variant="outline"
+                  type="button"
+                  disabled={
+                    !checkoutStore.discountCode || 
+                    !checkoutStore.selectedShipping ||
+                    !firstName ||
+                    !lastName ||
+                    !email ||
+                    !address1 ||
+                    !city ||
+                    !state ||
+                    !pincode ||
+                    !phone ||
+                    checkoutStore.isLoadingShipping
+                  }
+                >
+                  {checkoutStore.isLoadingShipping ? 'Calculating...' : 'Apply'}
+                </Button>
+              </div>
+              
+              {checkoutStore.showDiscountError && !checkoutStore.isDiscountValid && (
+                <p className="text-sm text-red-500 mt-2">Invalid discount code</p>
+              )}
+              {checkoutStore.isDiscountValid && (
+                <p className="text-sm text-green-600 mt-2">Discount applied successfully!</p>
+              )}
             </div>
-            
-            {checkoutStore.discountCode && !checkoutStore.isDiscountValid && (
-              <p className="text-sm text-red-500 mt-2">Invalid discount code</p>
-            )}
-            {checkoutStore.isDiscountValid && (
-              <p className="text-sm text-green-600 mt-2">Discount applied successfully!</p>
-            )}
-          </div>
+          )}
 
           {/* Payment Section */}
           <div className="bg-white p-6 border rounded-lg shadow-sm">

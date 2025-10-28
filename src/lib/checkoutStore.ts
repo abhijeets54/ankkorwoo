@@ -57,6 +57,7 @@ interface CheckoutState {
   discountCode: string;
   discountAmount: number;
   isDiscountValid: boolean;
+  showDiscountError: boolean;
   
   // Loading states
   isLoadingShipping: boolean;
@@ -93,6 +94,7 @@ export const useCheckoutStore = create<CheckoutState>()(
       discountCode: '',
       discountAmount: 0,
       isDiscountValid: false,
+      showDiscountError: false,
       isLoadingShipping: false,
       isProcessingPayment: false,
       error: null,
@@ -199,6 +201,7 @@ export const useCheckoutStore = create<CheckoutState>()(
           discountCode: '',
           discountAmount: 0,
           isDiscountValid: false,
+          showDiscountError: false,
           isLoadingShipping: false,
           isProcessingPayment: false,
           error: null,
@@ -206,12 +209,32 @@ export const useCheckoutStore = create<CheckoutState>()(
       },
 
       setDiscountCode: (code) => {
-        set({ discountCode: code, isDiscountValid: false, discountAmount: 0 });
-        get().calculateFinalAmount();
+        // Only update the code and reset error state
+        set({ 
+          discountCode: code,
+          showDiscountError: false 
+        });
       },
 
       applyDiscount: () => {
-        const { discountCode, subtotal, shippingCost } = get();
+        const { 
+          discountCode, 
+          subtotal, 
+          shippingCost, 
+          selectedShipping,
+          shippingAddress,
+          isLoadingShipping
+        } = get();
+        
+        // Validate all required information is available
+        if (!selectedShipping || !shippingAddress || isLoadingShipping) {
+          set({ 
+            isDiscountValid: false,
+            discountAmount: 0,
+            showDiscountError: true
+          });
+          return;
+        }
         
         if (discountCode.toUpperCase() === 'ANKKOR10') {
           const subtotalWithShipping = subtotal + shippingCost;
@@ -221,12 +244,14 @@ export const useCheckoutStore = create<CheckoutState>()(
           set({ 
             isDiscountValid: true,
             discountAmount,
-            finalAmount
+            finalAmount,
+            showDiscountError: false
           });
         } else {
           set({ 
             isDiscountValid: false,
-            discountAmount: 0
+            discountAmount: 0,
+            showDiscountError: true
           });
           get().calculateFinalAmount();
         }
