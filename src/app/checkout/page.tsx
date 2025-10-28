@@ -672,6 +672,38 @@ export default function CheckoutPage() {
             )}
           </div>
 
+          {/* Discount Code Section */}
+          <div className="bg-white p-6 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-medium mb-4 flex items-center">
+              <Package className="mr-2 h-5 w-5" />
+              Discount Code
+            </h2>
+            
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Enter discount code"
+                value={checkoutStore.discountCode}
+                onChange={(e) => checkoutStore.setDiscountCode(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                onClick={() => checkoutStore.applyDiscount()}
+                variant="outline"
+                type="button"
+              >
+                Apply
+              </Button>
+            </div>
+            
+            {checkoutStore.discountCode && !checkoutStore.isDiscountValid && (
+              <p className="text-sm text-red-500 mt-2">Invalid discount code</p>
+            )}
+            {checkoutStore.isDiscountValid && (
+              <p className="text-sm text-green-600 mt-2">Discount applied successfully!</p>
+            )}
+          </div>
+
           {/* Payment Section */}
           <div className="bg-white p-6 border rounded-lg shadow-sm">
             <h2 className="text-xl font-medium mb-4 flex items-center">
@@ -901,6 +933,12 @@ export default function CheckoutPage() {
                     }
                   </span>
                 </div>
+                {checkoutStore.isDiscountValid && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount (10% off)</span>
+                    <span>-₹{checkoutStore.discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-medium pt-2 border-t">
                   <span>Total</span>
                   <span>₹{checkoutStore.finalAmount.toFixed(2)}</span>

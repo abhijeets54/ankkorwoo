@@ -54,6 +54,9 @@ interface CheckoutState {
   subtotal: number;
   shippingCost: number;
   finalAmount: number;
+  discountCode: string;
+  discountAmount: number;
+  isDiscountValid: boolean;
   
   // Loading states
   isLoadingShipping: boolean;
@@ -71,6 +74,8 @@ interface CheckoutState {
   setError: (error: string | null) => void;
   setProcessingPayment: (processing: boolean) => void;
   clearCheckout: () => void;
+  applyDiscount: () => void;
+  setDiscountCode: (code: string) => void;
 }
 
 // Create the checkout store
@@ -85,6 +90,9 @@ export const useCheckoutStore = create<CheckoutState>()(
       subtotal: 0,
       shippingCost: 0,
       finalAmount: 0,
+      discountCode: '',
+      discountAmount: 0,
+      isDiscountValid: false,
       isLoadingShipping: false,
       isProcessingPayment: false,
       error: null,
@@ -96,11 +104,15 @@ export const useCheckoutStore = create<CheckoutState>()(
           return total + (price * item.quantity);
         }, 0);
 
-        // Calculate final amount directly to avoid separate state update
-        const { shippingCost } = get();
-        const finalAmount = subtotal + shippingCost;
-
-        set({ cart, subtotal, finalAmount });
+        set({ cart, subtotal });
+        
+        // Recalculate discount if valid
+        const { isDiscountValid } = get();
+        if (isDiscountValid) {
+          get().applyDiscount();
+        } else {
+          get().calculateFinalAmount();
+        }
 
         // Note: Shipping recalculation will be triggered by the useEffect in checkout page
         // when it detects the subtotal change
@@ -157,8 +169,9 @@ export const useCheckoutStore = create<CheckoutState>()(
       },
 
       calculateFinalAmount: () => {
-        const { subtotal, shippingCost, finalAmount: currentFinalAmount } = get();
-        const newFinalAmount = subtotal + shippingCost;
+        const { subtotal, shippingCost, discountAmount, finalAmount: currentFinalAmount } = get();
+        const subtotalWithShipping = subtotal + shippingCost;
+        const newFinalAmount = subtotalWithShipping - discountAmount;
 
         // Only update if the value actually changed to prevent infinite loops
         if (newFinalAmount !== currentFinalAmount) {
@@ -183,10 +196,40 @@ export const useCheckoutStore = create<CheckoutState>()(
           subtotal: 0,
           shippingCost: 0,
           finalAmount: 0,
+          discountCode: '',
+          discountAmount: 0,
+          isDiscountValid: false,
           isLoadingShipping: false,
           isProcessingPayment: false,
           error: null,
         });
+      },
+
+      setDiscountCode: (code) => {
+        set({ discountCode: code, isDiscountValid: false, discountAmount: 0 });
+        get().calculateFinalAmount();
+      },
+
+      applyDiscount: () => {
+        const { discountCode, subtotal, shippingCost } = get();
+        
+        if (discountCode.toUpperCase() === 'ANKKOR10') {
+          const subtotalWithShipping = subtotal + shippingCost;
+          const discountAmount = Math.round((subtotalWithShipping * 0.1) * 100) / 100;
+          const finalAmount = subtotalWithShipping - discountAmount;
+          
+          set({ 
+            isDiscountValid: true,
+            discountAmount,
+            finalAmount
+          });
+        } else {
+          set({ 
+            isDiscountValid: false,
+            discountAmount: 0
+          });
+          get().calculateFinalAmount();
+        }
       },
     }),
     {
