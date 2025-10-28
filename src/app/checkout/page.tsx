@@ -323,9 +323,9 @@ export default function CheckoutPage() {
             cartStore.clearCart();
             checkoutStore.clearCheckout();
 
-            // Redirect to order confirmation
+            // Redirect to order confirmation using window.location for immediate navigation
             console.log('Redirecting to order confirmation page...');
-            router.push(`/order-confirmed?id=${verificationResult.orderId}`);
+            window.location.href = `/order-confirmed?id=${verificationResult.orderId}`;
           } else {
             throw new Error(verificationResult.message || 'Payment verification failed');
           }
@@ -436,9 +436,9 @@ export default function CheckoutPage() {
             cartStore.clearCart();
             checkoutStore.clearCheckout();
 
-            // Redirect to order confirmation with COD info
+            // Redirect to order confirmation with COD info using window.location
             console.log('Redirecting to order confirmation page...');
-            router.push(`/order-confirmed?id=${data.orderId}&cod=true`);
+            window.location.href = `/order-confirmed?id=${data.orderId}&cod=true`;
           } else {
             throw new Error(data.message || 'COD prepayment verification failed');
           }

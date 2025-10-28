@@ -70,7 +70,11 @@ export async function sendOrderConfirmationEmail(params: SendOrderConfirmationPa
       }),
       items: params.orderData.cartItems.map((item) => ({
         name: item.attributes && item.attributes.length > 0
-          ? `${item.name} (${item.attributes.map(a => a.value).join(', ')})`
+          ? `${item.name} (Size: ${item.attributes.find(a => a.name.toLowerCase() === 'size')?.value || 'N/A'}${
+              item.attributes.filter(a => a.name.toLowerCase() !== 'size').length > 0 
+                ? `, ${item.attributes.filter(a => a.name.toLowerCase() !== 'size').map(a => `${a.name}: ${a.value}`).join(', ')}` 
+                : ''
+            })`
           : item.name,
         quantity: item.quantity,
         price: item.price * item.quantity
@@ -84,12 +88,16 @@ export async function sendOrderConfirmationEmail(params: SendOrderConfirmationPa
         : 'Cash on Delivery'
     });
 
-    const result = await resend.emails.send({
+    const { data: result, error } = await resend.emails.send({
       from: 'Ankkor <orders@ankkor.in>', // Change this to your verified domain
       to: params.to,
       subject: `Order Confirmation - #${params.orderNumber}`,
       html: emailHtml
     });
+
+    if (error || !result) {
+      throw new Error(error?.message || 'Failed to send email');
+    }
 
     console.log('✅ Order confirmation email sent via Resend:', result.id);
     return { success: true, messageId: result.id };

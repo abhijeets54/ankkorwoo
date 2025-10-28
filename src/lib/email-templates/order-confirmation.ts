@@ -59,8 +59,14 @@ export function generateOrderConfirmationEmail(data: OrderEmailData): string {
         <h4 style="margin-top: 20px;">Items Ordered:</h4>
         ${data.items.map(item => `
           <div class="item-row">
-            <span>${item.name} × ${item.quantity}</span>
-            <span>₹${item.price.toFixed(2)}</span>
+            <div style="flex: 1;">
+              <div>${item.name}</div>
+              ${item.name.includes('(') ? '' : `<div style="font-size: 0.9em; color: #666; margin-top: 2px;">Qty: ${item.quantity}</div>`}
+            </div>
+            <div style="text-align: right;">
+              <div>₹${item.price.toFixed(2)}</div>
+              ${item.name.includes('(') ? `<div style="font-size: 0.9em; color: #666; margin-top: 2px;">Qty: ${item.quantity}</div>` : ''}
+            </div>
           </div>
         `).join('')}
 

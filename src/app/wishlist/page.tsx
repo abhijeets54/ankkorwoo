@@ -280,12 +280,10 @@ export default function WishlistPage() {
         toast.error(stockValidation.message || 'This product is out of stock');
 
         // If there's a capped quantity available, offer to add that amount instead
-        if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
-          setQuantities(prev => ({ ...prev, [item.id]: stockValidation.cappedQuantity }));
-          toast.success(`Quantity adjusted to available stock: ${stockValidation.cappedQuantity}`);
-        }
-
-        setAddingToCart(prev => ({ ...prev, [item.id]: false }));
+          if (stockValidation.cappedQuantity && stockValidation.cappedQuantity > 0) {
+            setQuantities(prev => ({ ...prev, [item.id]: stockValidation.cappedQuantity || 1 }));
+            toast.success(`Quantity adjusted to available stock: ${stockValidation.cappedQuantity}`);
+          }        setAddingToCart(prev => ({ ...prev, [item.id]: false }));
         return;
       }
 
@@ -503,7 +501,7 @@ export default function WishlistPage() {
                   No account needed - your wishlist is saved locally on this device.
                 </p>
               )}
-              <Link href="/categories">
+              <Link href="/collection">
                 <Button>
                   Continue Shopping
                 </Button>
@@ -629,7 +627,7 @@ export default function WishlistPage() {
               </div>
               
               <div className="mt-12 text-center">
-                <Link href="/categories">
+                <Link href="/collection">
                   <Button variant="outline">Continue Shopping</Button>
                 </Link>
               </div>

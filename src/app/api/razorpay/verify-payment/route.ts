@@ -239,10 +239,26 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
           }
         }
 
-        // Don't add meta_data - let WooCommerce handle variation attributes automatically
-        // Adding meta_data can cause "Invalid parameter" errors
+        // Add meta_data for attributes (including size)
+        if (item.attributes && item.attributes.length > 0) {
+          lineItem.meta_data = item.attributes.map((attr: any) => {
+            // Format the attribute name correctly for WooCommerce
+            const attributeName = attr.name.toLowerCase()
+              .replace(/[^a-z0-9]/g, '-')  // Replace non-alphanumeric characters with hyphens
+              .replace(/-+/g, '-')         // Replace multiple hyphens with single hyphen
+              .replace(/^-|-$/g, '');      // Remove leading/trailing hyphens
 
-        console.log('Creating line item:', lineItem);
+            return {
+              key: attributeName === 'size' ? 'pa_size' : `pa_${attributeName}`,
+              value: attr.value.toLowerCase().trim()
+            };
+          });
+        }
+
+        console.log('Creating line item with attributes:', {
+          ...lineItem,
+          attributes: item.attributes
+        });
         return lineItem;
       }),
       shipping_lines: [{
