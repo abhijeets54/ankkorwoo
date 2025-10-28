@@ -70,7 +70,7 @@ const NewsletterPopup = () => {
               Welcome to Ankkor
             </h2>
             <p className="text-[#5c5c52] mb-6">
-              Tell us about your preferences before we launch, check back soon and we'll be up and running.
+              Tell us about your preferences, check out our website for whole range of collections.
             </p>
 
             {state.succeeded ? (
