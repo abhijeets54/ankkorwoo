@@ -734,7 +734,7 @@ export default function CheckoutPage() {
               )}
               {checkoutStore.isDiscountValid && (
                 <p className="text-sm text-green-600 mt-2">
-                  {checkoutStore.discountCode.toUpperCase() === 'ANKKOR10' 
+                  {checkoutStore.discountCode === 'ANKKOR10' 
                     ? '10% discount applied successfully!' 
                     : '99% discount applied successfully!'}
                 </p>

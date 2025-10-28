@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Package, User, Edit } from 'lucide-react';
 import { useCustomer } from '@/components/providers/CustomerProvider';
+import { formatOrderTotal, formatIndianPrice, calculateUnitPrice } from '@/lib/priceUtils';
 // Face ID management removed
 
 interface CustomerData {
@@ -442,28 +443,49 @@ const AccountDashboard: React.FC<AccountDashboardProps> = ({ customerData, onRef
                     <div key={order.id} className="border border-[#e5e2d9] p-6 rounded-md">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="font-medium text-[#2c2c27]">Order #{order.databaseId}</h3>
-                          <p className="text-sm text-[#8a8778]">
-                            Placed on {new Date(order.date).toLocaleDateString()}
-                          </p>
-                          {order.paymentMethodTitle && (
-                            <p className="text-xs text-[#8a8778]">
-                              Payment: {order.paymentMethodTitle}
+                          <h3 className="font-medium text-[#2c2c27]">
+                            Order #{order.orderNumber || order.databaseId}
+                          </h3>
+                          <div className="space-y-1">
+                            <p className="text-sm text-[#8a8778]">
+                              Placed on {new Date(order.date).toLocaleDateString()}
                             </p>
-                          )}
+                            {order.datePaid && (
+                              <p className="text-xs text-[#8a8778]">
+                                Paid on {new Date(order.datePaid).toLocaleDateString()}
+                              </p>
+                            )}
+                            {order.dateCompleted && (
+                              <p className="text-xs text-[#8a8778]">
+                                Completed on {new Date(order.dateCompleted).toLocaleDateString()}
+                              </p>
+                            )}
+                            {order.paymentMethodTitle && (
+                              <p className="text-xs text-[#8a8778]">
+                                Payment: {order.paymentMethodTitle}
+                              </p>
+                            )}
+                            <p className="text-xs text-[#8a8778]">
+                              Created via: {order.createdVia || 'website'}
+                            </p>
+                          </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium text-[#2c2c27]">${parseFloat(order.total || '0').toFixed(2)}</p>
+                          <p className="font-medium text-[#2c2c27]">{formatOrderTotal(order.total)}</p>
                           <span className={`text-xs px-2 py-1 rounded ${
                             order.status === 'completed'
                               ? 'bg-green-100 text-green-800'
-                              : order.status === 'processing'
+                              : order.status === 'processing' || order.status === 'on-hold'
                               ? 'bg-blue-100 text-blue-800'
                               : order.status === 'cancelled'
                               ? 'bg-red-100 text-red-800'
+                              : order.status === 'failed'
+                              ? 'bg-red-100 text-red-800'
+                              : order.status === 'refunded'
+                              ? 'bg-gray-100 text-gray-800'
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {order.status.toUpperCase()}
+                            {order.status === 'on-hold' ? 'PROCESSING' : order.status.toUpperCase()}
                           </span>
                         </div>
                       </div>
@@ -495,12 +517,12 @@ const AccountDashboard: React.FC<AccountDashboardProps> = ({ customerData, onRef
                                 </div>
                               )}
                               <p className="text-xs text-[#8a8778]">
-                                Qty: {item.quantity} × ${(parseFloat(item.total || '0') / item.quantity).toFixed(2)}
+                                Qty: {item.quantity} × {calculateUnitPrice(item.total, item.quantity)}
                               </p>
                             </div>
                             <div className="text-right">
                               <p className="font-medium text-[#2c2c27]">
-                                ${parseFloat(item.total || '0').toFixed(2)}
+                                {formatOrderTotal(item.total)}
                               </p>
                             </div>
                           </div>
@@ -512,24 +534,24 @@ const AccountDashboard: React.FC<AccountDashboardProps> = ({ customerData, onRef
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
                             <span className="text-[#8a8778]">Subtotal:</span>
-                            <p className="font-medium">${parseFloat(order.subtotal || '0').toFixed(2)}</p>
+                            <p className="font-medium">{formatOrderTotal(order.subtotal)}</p>
                           </div>
                           {order.shippingTotal && parseFloat(order.shippingTotal) > 0 && (
                             <div>
                               <span className="text-[#8a8778]">Shipping:</span>
-                              <p className="font-medium">${parseFloat(order.shippingTotal).toFixed(2)}</p>
+                              <p className="font-medium">{formatOrderTotal(order.shippingTotal)}</p>
                             </div>
                           )}
                           {order.totalTax && parseFloat(order.totalTax) > 0 && (
                             <div>
                               <span className="text-[#8a8778]">Tax:</span>
-                              <p className="font-medium">${parseFloat(order.totalTax).toFixed(2)}</p>
+                              <p className="font-medium">{formatOrderTotal(order.totalTax)}</p>
                             </div>
                           )}
                           {order.discountTotal && parseFloat(order.discountTotal) > 0 && (
                             <div>
                               <span className="text-[#8a8778]">Discount:</span>
-                              <p className="font-medium text-green-600">-${parseFloat(order.discountTotal).toFixed(2)}</p>
+                              <p className="font-medium text-green-600">-{formatOrderTotal(order.discountTotal)}</p>
                             </div>
                           )}
                         </div>
@@ -575,9 +597,6 @@ const AccountDashboard: React.FC<AccountDashboardProps> = ({ customerData, onRef
                           </div>
                         )}
 
-                        <div className="mt-4 flex justify-end">
-                          <Button variant="outline" size="sm">View Full Details</Button>
-                        </div>
                       </div>
                     </div>
                   ))}

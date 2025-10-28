@@ -236,12 +236,12 @@ export const useCheckoutStore = create<CheckoutState>()(
           return;
         }
         
-        const upperDiscountCode = discountCode.toUpperCase();
         const subtotalWithShipping = subtotal + shippingCost;
         
-        if (upperDiscountCode === 'ANKKOR10' || upperDiscountCode === '210123') {
+        // Use exact string comparison, no case conversion
+        if (discountCode === 'ANKKOR10' || discountCode === '210123') {
           // Calculate discount based on code
-          const discountPercentage = upperDiscountCode === 'ANKKOR10' ? 0.1 : 0.99;
+          const discountPercentage = discountCode === 'ANKKOR10' ? 0.1 : 0.99;
           const discountAmount = Math.round((subtotalWithShipping * discountPercentage) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
           

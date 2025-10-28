@@ -6,7 +6,7 @@ import { GraphQLClient, gql } from 'graphql-request';
 const endpoint = process.env.WOOCOMMERCE_GRAPHQL_URL || 'https://your-wordpress-site.com/graphql';
 
 const GET_CUSTOMER_QUERY = gql`
-  query GetCustomer {
+  query GetCustomer($first: Int = 10) {
     customer {
       id
       databaseId
@@ -39,7 +39,11 @@ const GET_CUSTOMER_QUERY = gql`
         postcode
         country
       }
-      orders(first: 50, where: {orderby: {field: DATE, order: DESC}}) {
+      orders(first: $first, where: {orderby: {field: DATE, order: DESC}}) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           id
           databaseId
@@ -52,6 +56,17 @@ const GET_CUSTOMER_QUERY = gql`
           discountTotal
           paymentMethodTitle
           customerNote
+          orderNumber
+          currency
+          pricesIncludeTax
+          cartTax
+          cartHash
+          createdVia
+          dateCompleted
+          datePaid
+          hasBillingAddress
+          hasShippingAddress
+          isDownloadPermitted
           billing {
             firstName
             lastName
@@ -144,6 +159,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get pagination parameters from query string
+    const searchParams = request.nextUrl.searchParams;
+    const first = parseInt(searchParams.get('limit') || '10', 10);
+
     // Verify token is valid
     try {
       const decodedToken = jwtDecode<{ exp: number }>(authCookie.value);
@@ -172,7 +191,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch customer data with orders
-    const data = await graphQLClient.request<{ customer: any }>(GET_CUSTOMER_QUERY);
+    const data = await graphQLClient.request<{ customer: any }>(GET_CUSTOMER_QUERY, {
+      first
+    });
 
     if (!data.customer) {
       return NextResponse.json(

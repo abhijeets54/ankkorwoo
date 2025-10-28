@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomer } from '@/components/providers/CustomerProvider';
 import AccountDashboard from '@/components/account/AccountDashboard';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 export default function AccountPage() {
@@ -12,6 +13,8 @@ export default function AccountPage() {
   const [customerData, setCustomerData] = useState<any>(null);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+  const [orderLimit, setOrderLimit] = useState(10);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -32,7 +35,7 @@ export default function AccountPage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/customer-with-orders', {
+      const response = await fetch(`/api/customer-with-orders?limit=${orderLimit}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -45,6 +48,7 @@ export default function AccountPage() {
 
       if (data.success && data.customer) {
         setCustomerData(data.customer);
+        setHasMoreOrders(data.customer.orders?.pageInfo?.hasNextPage || false);
       } else {
         throw new Error(data.message || 'Failed to load customer data');
       }
@@ -92,8 +96,23 @@ export default function AccountPage() {
     <div className="container mx-auto py-12 px-4">
       <h1 className="text-3xl font-serif mb-8">My Account</h1>
 
-      {customerData ? (
-        <AccountDashboard customerData={customerData} onRefresh={fetchCustomerData} />
+              {customerData ? (
+        <>
+          <AccountDashboard customerData={customerData} onRefresh={fetchCustomerData} />
+          {hasMoreOrders && !isLoadingOrders && (
+            <div className="mt-4 text-center">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setOrderLimit(prev => prev + 10);
+                  fetchCustomerData();
+                }}
+              >
+                Load More Orders
+              </Button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded">
           Unable to load account information. Please try again later.
