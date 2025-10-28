@@ -9,6 +9,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import LaunchingSoonProvider from "@/components/providers/LaunchingSoonProvider";
 import LaunchingStateInitializer from "@/components/LaunchingStateInitializer";
 import LaunchUtilsInitializer from "@/components/utils/LaunchUtilsInitializer";
+import LaunchingSoonOverlay from "@/components/LaunchingSoonOverlay";
 import StoreHydrationInitializer from "@/components/StoreHydrationInitializer";
 import CartWrapper from "@/components/cart/CartWrapper";
 import NavbarWrapperSSR from "@/components/layout/NavbarWrapperSSR";
@@ -63,6 +64,7 @@ export default function RootLayout({
                   <LaunchingStateInitializer />
                   <LaunchUtilsInitializer />
                   <StoreHydrationInitializer />
+                  <LaunchingSoonOverlay />
                   {/* NavbarWrapper and FooterWrapper - now SSR-safe with dynamic imports */}
                   <NavbarWrapperSSR />
                   <main style={{ paddingTop: 0 }} className="transition-all duration-300">
