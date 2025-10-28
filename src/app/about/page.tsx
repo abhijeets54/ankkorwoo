@@ -101,7 +101,7 @@ export default function AboutPage() {
           className="absolute inset-0"
         >
           <Image
-            src="https://images.unsplash.com/photo-1621072156002-e2fccdc0b176?q=80&w=2940&auto=format&fit=crop"
+            src="/ap1.png"
             alt="ANKKOR Heritage"
             fill
             className="object-cover object-center"
@@ -227,7 +227,7 @@ export default function AboutPage() {
                   <div className="absolute -inset-4 border border-[#8a8778]/20 -z-10"></div>
                   <div className="overflow-hidden">
                     <Image
-                      src="https://images.unsplash.com/photo-1620012253295-c15cc3e65df4?q=80&w=2940&auto=format&fit=crop"
+                      src="/ap2.png"
                       alt="ANKKOR Craftsmanship"
                       width={1200}
                       height={800}
@@ -276,126 +276,7 @@ export default function AboutPage() {
               </blockquote>
             </motion.div>
             
-            {/* Full-width Image */}
-            <motion.div 
-              className="my-32 relative overflow-hidden h-[70vh]" 
-              variants={fadeIn}
-            >
-              <Image
-                src="https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=2940&auto=format&fit=crop"
-                alt="ANKKOR Shirt Craftsmanship"
-                fill
-                className="object-cover object-center"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#2c2c27]/70 flex items-end">
-                <div className="container mx-auto px-4 py-16">
-                  <div className="max-w-xl">
-                    <div className="h-px w-24 bg-[#f8f8f5] mb-8"></div>
-                    <h3 className="text-3xl font-serif text-[#f8f8f5] mb-6">Uncompromising Quality</h3>
-                    <p className="text-[#f4f3f0]/90 text-lg leading-relaxed">
-                      Every thread, every stitch, every detail carefully considered and immaculately executed to create garments of exceptional character and enduring value.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-            
-            {/* Three Column Features */}
-            <motion.div
-              className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-32"
-              variants={stagger}
-            >
-              <motion.div 
-                className="space-y-6 text-center"
-                variants={fadeIn}
-              >
-                <div className="w-20 h-20 mx-auto border border-[#8a8778]/30 rounded-full flex items-center justify-center">
-                  <span className="font-serif text-2xl text-[#2c2c27]">01</span>
-                </div>
-                <h3 className="font-serif text-xl text-[#2c2c27]">Premium Fabrics</h3>
-                <p className="text-[#5c5c52]">Sourced from Europe's most prestigious mills, selected for their exceptional quality and character</p>
-              </motion.div>
-              
-              <motion.div 
-                className="space-y-6 text-center"
-                variants={fadeIn}
-              >
-                <div className="w-20 h-20 mx-auto border border-[#8a8778]/30 rounded-full flex items-center justify-center">
-                  <span className="font-serif text-2xl text-[#2c2c27]">02</span>
-                </div>
-                <h3 className="font-serif text-xl text-[#2c2c27]">Masterful Tailoring</h3>
-                <p className="text-[#5c5c52]">Expert craftsmanship ensuring precision in every seam and detail</p>
-              </motion.div>
-              
-              <motion.div 
-                className="space-y-6 text-center"
-                variants={fadeIn}
-              >
-                <div className="w-20 h-20 mx-auto border border-[#8a8778]/30 rounded-full flex items-center justify-center">
-                  <span className="font-serif text-2xl text-[#2c2c27]">03</span>
-                </div>
-                <h3 className="font-serif text-xl text-[#2c2c27]">Timeless Design</h3>
-                <p className="text-[#5c5c52]">Elegant silhouettes that transcend trends and stand the test of time</p>
-              </motion.div>
-            </motion.div>
-            
-            {/* Dual Image Section */}
-            <motion.div 
-              className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-32" 
-              variants={stagger}
-            >
-              <motion.div 
-                className="space-y-8"
-                variants={fadeIn}
-              >
-                <div className="overflow-hidden">
-                  <motion.div
-                    initial={{ scale: 1.2 }}
-                    whileInView={{ scale: 1 }}
-                    transition={{ duration: 1.5, ease: [0.25, 0.1, 0.25, 1] }}
-                    viewport={{ once: true, margin: "-20% 0px" }}
-                  >
-                    <Image
-                      src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=2072&auto=format&fit=crop"
-                      alt="ANKKOR Shirt Detail"
-                      width={800}
-                      height={1000}
-                      className="w-full h-auto shadow-md"
-                    />
-                  </motion.div>
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl text-[#2c2c27] mb-3">Superior Materials</h3>
-                  <p className="text-[#5c5c52]">Our shirts feature the finest Egyptian and Supima cotton, selected for their exceptional softness, durability and lustrous appearance</p>
-                </div>
-              </motion.div>
-              
-              <motion.div 
-                className="space-y-8 mt-16 md:mt-32"
-                variants={fadeIn}
-              >
-                <div className="overflow-hidden">
-                  <motion.div
-                    initial={{ scale: 1.2 }}
-                    whileInView={{ scale: 1 }}
-                    transition={{ duration: 1.5, ease: [0.25, 0.1, 0.25, 1] }}
-                    viewport={{ once: true, margin: "-20% 0px" }}
-                  >
-                    <Image
-                      src="https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=2940&auto=format&fit=crop"
-                      alt="ANKKOR Shirt Craftsmanship"
-                      width={800}
-                      height={1000}
-                      className="w-full h-auto shadow-md"
-                    />
-                  </motion.div>
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl text-[#2c2c27] mb-3">Meticulous Construction</h3>
-                  <p className="text-[#5c5c52]">Every shirt undergoes rigorous quality control and features hand-finished details that elevate it from ordinary to extraordinary</p>
-                </div>
-              </motion.div>
-            </motion.div>
+            {/* Final Paragraph Section */}
             
             {/* Final Paragraph Section */}
             <motion.div 
@@ -439,36 +320,6 @@ export default function AboutPage() {
               </div>
             </motion.div>
             
-            {/* Brand Signature */}
-            <motion.div 
-              className="text-center border-t border-[#e5e2d9] pt-20"
-              variants={fadeIn}
-            >
-              <motion.p 
-                className="font-serif text-3xl md:text-4xl text-[#2c2c27] mb-5 tracking-wide leading-relaxed"
-                variants={letterAnimation}
-              >
-                ANKKOR – Where class meets character.
-              </motion.p>
-              <motion.p 
-                className="italic text-[#8a8778] tracking-widest uppercase text-sm font-light mb-10"
-                variants={letterAnimation}
-              >
-                Wear timeless. Be anchored.
-              </motion.p>
-              
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1.5, delay: 1 }}
-                className="relative flex justify-center items-center"
-              >
-                <div className="w-[1px] h-20 bg-[#e5e2d9]"></div>
-                <div className="absolute bottom-0 w-16 h-16 rounded-full border border-[#e5e2d9] flex items-center justify-center">
-                  <Anchor className="h-8 w-8 text-[#2c2c27]" strokeWidth={1.5} />
-                </div>
-              </motion.div>
-            </motion.div>
           </motion.div>
         </div>
       </div>

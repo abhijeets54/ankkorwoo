@@ -322,23 +322,6 @@ export default function ShirtsCollectionPage() {
         </div>
       </div>
       
-      {/* Collection Banner */}
-      <div className="relative h-[300px] mb-16 overflow-hidden">
-        <Image
-          src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80"
-          alt="Ankkor Shirts Collection"
-          fill
-          sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover image-animate"
-        />
-        <div className="absolute inset-0 bg-[#2c2c27] bg-opacity-30 flex items-center justify-center">
-          <div className="text-center text-white">
-            <h2 className="text-3xl font-serif font-bold mb-4">Signature Shirts</h2>
-            <p className="text-lg max-w-xl mx-auto">Impeccably tailored for the perfect fit</p>
-          </div>
-        </div>
-      </div>
-      
       {/* Filters and Products */}
       <div className="container mx-auto px-4">
         {/* Error message */}

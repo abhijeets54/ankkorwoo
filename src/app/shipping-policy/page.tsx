@@ -46,7 +46,7 @@ export default function ShippingPolicyPage() {
                 </div>
                 <h3 className="font-serif text-lg text-[#2c2c27] mb-2">Trusted Partners</h3>
                 <p className="text-sm">
-                  We ship exclusively within India using our trusted logistics partners — DTDC and Dehlivery.
+                  We ship exclusively within India using our trusted logistics partners.
                 </p>
               </div>
               
