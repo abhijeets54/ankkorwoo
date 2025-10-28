@@ -15,6 +15,8 @@ import { Loader2, Truck, CreditCard, Package } from 'lucide-react';
 import StateCitySelector from '@/components/checkout/StateCitySelector';
 import { getLocationFromPincode } from '@/lib/locationUtils';
 import { CartSizeUtils } from '@/lib/cartSizeUtils';
+import { getCustomerId } from '@/lib/customerUtils';
+import { CartItem, CartItemAttribute } from '@/types/cart';
 
 interface CheckoutFormData {
   firstName: string;
@@ -30,11 +32,14 @@ interface CheckoutFormData {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useCustomer();
+  const { isAuthenticated, isLoading, customer } = useCustomer();
   const cartStore = useLocalCartStore();
   const checkoutStore = useCheckoutStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'online' | 'cod_prepaid'>('online');
+  
+  // Safely get customer ID using utility function
+  const customerId = React.useMemo(() => getCustomerId(customer), [customer]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CheckoutFormData>({
     mode: 'onChange'
@@ -202,7 +207,7 @@ export default function CheckoutPage() {
 
         if (!validation.isValid) {
           stockIssues.push(
-            `${item.name}${item.attributes?.length ? ` (${item.attributes.map(a => a.value).join(', ')})` : ''}: ${validation.message || 'Out of stock'}`
+            `${item.name}${item.attributes?.length ? ` (${item.attributes.map((a: CartItemAttribute) => a.value).join(', ')})` : ''}: ${validation.message || 'Out of stock'}`
           );
         }
       }
@@ -790,10 +795,10 @@ export default function CheckoutPage() {
             <div className="space-y-4">
               {checkoutStore.cart.map(item => {
                 // Extract size information from cart item
-                const sizeInfo = item.attributes?.find(attr => 
+                const sizeInfo = item.attributes?.find((attr: CartItemAttribute) => 
                   ['Size', 'size', 'pa_size', 'product_size'].includes(attr.name)
                 );
-                const otherAttributes = item.attributes?.filter(attr => 
+                const otherAttributes = item.attributes?.filter((attr: CartItemAttribute) => 
                   !['Size', 'size', 'pa_size', 'product_size'].includes(attr.name)
                 ) || [];
 
@@ -822,7 +827,7 @@ export default function CheckoutPage() {
                       {/* Other attributes */}
                       {otherAttributes.length > 0 && (
                         <div className="text-xs text-gray-500 mt-1">
-                          {otherAttributes.map((attr, index) => (
+                          {otherAttributes.map((attr: CartItemAttribute, index: number) => (
                             <span key={attr.name}>
                               {attr.name}: {attr.value}
                               {index < otherAttributes.length - 1 ? ', ' : ''}

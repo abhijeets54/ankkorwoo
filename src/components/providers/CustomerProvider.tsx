@@ -2,17 +2,36 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Customer } from '@/lib/customerUtils';
+
+interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+interface RegistrationData {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+}
+
+interface ProfileUpdateData {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
 
 // Customer context type - now delegates to AuthContext
 interface CustomerContextType {
-  customer: any | null;
+  customer: Customer | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   token: string | null;
-  login: (credentials: {email: string, password: string}) => Promise<void>;
-  register: (registration: {email: string, firstName: string, lastName: string, password: string}) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (registration: RegistrationData) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (data: any) => Promise<any>;
+  updateProfile: (data: ProfileUpdateData) => Promise<void>;
   error: string | null;
   refreshCustomer: () => Promise<void>;
 }

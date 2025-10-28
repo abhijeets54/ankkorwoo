@@ -97,27 +97,39 @@ export const loadRazorpayScript = (): Promise<boolean> => {
 export const createRazorpayOrder = async (
   amount: number,
   receipt: string,
-  notes: Record<string, string> = {}
+  notes: Record<string, string> = {},
+  retryCount: number = 0
 ): Promise<RazorpayOrderResponse> => {
   try {
     // Validate amount
-    if (!amount || amount <= 0) {
-      throw new Error('Invalid amount');
+    if (!amount || isNaN(amount) || amount <= 0) {
+      throw new Error('Invalid amount. Please check your cart and try again.');
     }
 
     if (amount < 1) {
       throw new Error('Minimum order amount is ₹1');
     }
 
+    // Round amount to 2 decimal places to avoid floating point issues
+    amount = Math.round(amount * 100) / 100;
+
     console.log('Creating Razorpay order:', { amount, receipt, notes });
 
+    // Check if we're on localhost
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    console.log('Creating order on:', window.location.hostname);
+      
     const response = await fetch('/api/razorpay/create-order', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // Add origin header for localhost testing
+        ...(isLocalhost && {'Origin': 'http://localhost:3000'})
       },
       body: JSON.stringify({
-        amount: Math.round(amount * 100), // Convert to paise
+        amount: amount, // Server will convert to paise
         receipt,
         notes,
       }),
@@ -139,14 +151,28 @@ export const createRazorpayOrder = async (
     const data = await response.json();
     console.log('Razorpay order created successfully:', data.id);
     return data;
-  } catch (error) {
-    console.error('Error creating Razorpay order:', error);
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
 
-    if (error instanceof Error) {
-      throw error;
-    } else {
-      throw new Error('Failed to create payment order');
-    }
+      // Retry up to 3 times for network errors or 500 errors
+      if (retryCount < 3 && (
+        error instanceof Error && (
+          error.message === 'Payment gateway error. Please try again.' ||
+          error.message.includes('network') ||
+          error.message.includes('Failed to fetch')
+        )
+      )) {
+        console.log(`Retrying order creation (attempt ${retryCount + 1})...`);
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+        return createRazorpayOrder(amount, receipt, notes, retryCount + 1);
+      }
+
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Failed to create payment order');
+      }
   }
 };
 
