@@ -267,7 +267,14 @@ export default function CheckoutPage() {
         customer_phone: checkoutStore.shippingAddress!.phone,
         customer_name: `${checkoutStore.shippingAddress!.firstName} ${checkoutStore.shippingAddress!.lastName}`,
         shipping_method: checkoutStore.selectedShipping!.name,
-        payment_method: 'online'
+        payment_method: 'online',
+        // Store complete order data for webhook backup
+        order_data: JSON.stringify({
+          address: checkoutStore.shippingAddress,
+          cartItems: checkoutStore.cart,
+          shipping: checkoutStore.selectedShipping,
+          customerId: customer?.databaseId || null
+        })
       }
     );
 
@@ -357,7 +364,14 @@ export default function CheckoutPage() {
         customer_name: `${checkoutStore.shippingAddress!.firstName} ${checkoutStore.shippingAddress!.lastName}`,
         shipping_method: checkoutStore.selectedShipping!.name,
         payment_method: 'cod_prepaid',
-        cod_convenience_fee: 'true'
+        cod_convenience_fee: 'true',
+        // Store complete order data for webhook backup
+        order_data: JSON.stringify({
+          address: checkoutStore.shippingAddress,
+          cartItems: checkoutStore.cart,
+          shipping: checkoutStore.selectedShipping,
+          customerId: customer?.databaseId || null
+        })
       }
     );
 
