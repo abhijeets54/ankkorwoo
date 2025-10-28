@@ -15,6 +15,7 @@ import CartWrapper from "@/components/cart/CartWrapper";
 import NavbarWrapperSSR from "@/components/layout/NavbarWrapperSSR";
 import FooterWrapperSSR from "@/components/layout/FooterWrapperSSR";
 import { StockUpdateProvider } from "@/contexts/StockUpdateContext";
+import { Analytics } from '@vercel/analytics/react';
 
 // Serif font for headings
 const playfair = Playfair_Display({
@@ -80,6 +81,7 @@ export default function RootLayout({
             </CustomerProvider>
           </AuthProvider>
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );
