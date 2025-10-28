@@ -19,6 +19,7 @@ import { CartSizeUtils } from '@/lib/cartSizeUtils';
 interface CheckoutFormData {
   firstName: string;
   lastName: string;
+  email: string;
   address1: string;
   address2?: string;
   city: string;
@@ -51,6 +52,7 @@ export default function CheckoutPage() {
   const city = watch('city');
   const firstName = watch('firstName');
   const lastName = watch('lastName');
+  const email = watch('email');
   const address1 = watch('address1');
   const phone = watch('phone');
 
@@ -128,6 +130,7 @@ export default function CheckoutPage() {
     const shippingAddress: ShippingAddress = {
       firstName: data.firstName,
       lastName: data.lastName,
+      email: data.email,
       address1: data.address1,
       address2: data.address2,
       city: data.city,
@@ -144,13 +147,14 @@ export default function CheckoutPage() {
     const formValues = watch();
 
     // Ensure shipping address is saved to store from form values
-    if (formValues.firstName && formValues.lastName && formValues.address1 &&
+    if (formValues.firstName && formValues.lastName && formValues.email && formValues.address1 &&
         formValues.city && formValues.state && formValues.pincode && formValues.phone) {
       const shippingAddress: ShippingAddress = {
         firstName: formValues.firstName,
         lastName: formValues.lastName,
-        address1: formValues.address1,
+        email: formValues.email,
         address2: formValues.address2,
+        address1: formValues.address1,
         city: formValues.city,
         state: formValues.state,
         pincode: formValues.pincode,
@@ -530,6 +534,26 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="md:col-span-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your.email@example.com"
+                    {...register('email', {
+                      required: 'Email address is required',
+                      pattern: {
+                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        message: 'Please enter a valid email address'
+                      }
+                    })}
+                    className={errors.email ? 'border-red-300' : ''}
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
                   <Label htmlFor="address1">Address Line 1</Label>
                   <Input
                     id="address1"
@@ -732,6 +756,7 @@ export default function CheckoutPage() {
                   isSubmitting ||
                   !firstName ||
                   !lastName ||
+                  !email ||
                   !address1 ||
                   !city ||
                   !state ||

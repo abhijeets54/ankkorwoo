@@ -206,6 +206,7 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
       billing: {
         first_name: orderData.address.firstName,
         last_name: orderData.address.lastName,
+        email: orderData.address.email,
         address_1: orderData.address.address1,
         address_2: orderData.address.address2 || '',
         city: orderData.address.city,
@@ -313,8 +314,8 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
     const order = await response.json();
     console.log('WooCommerce order created successfully:', order.id);
 
-    // Send order confirmation email (optional)
-    await sendOrderConfirmationEmail(order, orderData.address);
+    // Send order confirmation email via Resend (backup to WooCommerce emails)
+    await sendOrderConfirmationEmail(order, orderData);
 
     return order.id.toString();
 
@@ -342,11 +343,32 @@ function calculateExpectedAmount(cartItems: any[], shipping: any): number {
   return Math.round(totalAmount * 100) / 100; // Round to 2 decimal places
 }
 
-async function sendOrderConfirmationEmail(order: any, address: any): Promise<void> {
+async function sendOrderConfirmationEmail(order: any, orderData: any): Promise<void> {
   try {
-    // This is optional - you can implement email sending here
-    // Using services like SendGrid, Nodemailer, etc.
-    console.log(`Order confirmation email should be sent for order ${order.id} to ${address.firstName} ${address.lastName}`);
+    // Import Resend email service
+    const { sendOrderConfirmationEmail: sendEmail } = await import('@/lib/send-email');
+
+    // Calculate total from orderData
+    const subtotal = orderData.cartItems.reduce(
+      (sum: number, item: any) => sum + (item.price * item.quantity),
+      0
+    );
+    const total = subtotal + orderData.shipping.cost;
+
+    await sendEmail({
+      to: orderData.address.email,
+      customerName: `${orderData.address.firstName} ${orderData.address.lastName}`,
+      orderNumber: order.id.toString(),
+      orderData: {
+        cartItems: orderData.cartItems,
+        shipping: orderData.shipping,
+        total,
+        address: orderData.address,
+        paymentMethod: 'online'
+      }
+    });
+
+    console.log('✅ Order confirmation email sent via Resend for order:', order.id);
 
     // Example with nodemailer (you'd need to install it):
     /*

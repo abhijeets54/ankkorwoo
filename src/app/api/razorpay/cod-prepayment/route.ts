@@ -202,6 +202,7 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
       billing: {
         first_name: orderData.address.firstName,
         last_name: orderData.address.lastName,
+        email: orderData.address.email,
         address_1: orderData.address.address1,
         address_2: orderData.address.address2 || '',
         city: orderData.address.city,
@@ -339,8 +340,8 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
     const order = await response.json();
     console.log('COD WooCommerce order created successfully:', order.id);
 
-    // Send COD order confirmation email
-    await sendCODOrderConfirmationEmail(order, orderData.address, codAmounts);
+    // Send COD order confirmation email via Resend (backup to WooCommerce emails)
+    await sendCODOrderConfirmationEmail(order, orderData, codAmounts);
 
     return order.id.toString();
 
@@ -350,22 +351,36 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
   }
 }
 
-async function sendCODOrderConfirmationEmail(order: any, address: any, codAmounts: any): Promise<void> {
+async function sendCODOrderConfirmationEmail(order: any, orderData: any, codAmounts: any): Promise<void> {
   try {
-    console.log(`COD Order confirmation email should be sent for order ${order.id}`);
-    console.log(`Customer: ${address.firstName} ${address.lastName}`);
-    console.log(`Convenience fee paid: ₹100`);
-    console.log(`Amount to pay on delivery: ₹${codAmounts.codAmount}`);
-    console.log(`Total cost: ₹${codAmounts.totalCost}`);
+    // Import Resend email service
+    const { sendOrderConfirmationEmail: sendEmail } = await import('@/lib/send-email');
 
-    // You can implement email sending here using services like:
-    // - Nodemailer with SMTP
-    // - SendGrid
-    // - AWS SES
-    // - WooCommerce's built-in email system (via webhook)
+    // Calculate total from orderData
+    const subtotal = orderData.cartItems.reduce(
+      (sum: number, item: any) => sum + (item.price * item.quantity),
+      0
+    );
+    const total = subtotal + orderData.shipping.cost;
 
+    await sendEmail({
+      to: orderData.address.email,
+      customerName: `${orderData.address.firstName} ${orderData.address.lastName}`,
+      orderNumber: order.id.toString(),
+      orderData: {
+        cartItems: orderData.cartItems,
+        shipping: orderData.shipping,
+        total,
+        address: orderData.address,
+        paymentMethod: 'cod'
+      }
+    });
+
+    console.log('✅ COD order confirmation email sent via Resend for order:', order.id);
+    console.log(`   Convenience fee paid: ₹100, Amount on delivery: ₹${codAmounts.codAmount}`);
   } catch (error) {
-    console.error('Error sending COD confirmation email:', error);
+    console.error('❌ Error sending COD confirmation email (non-critical):', error);
     // Don't throw error here as order creation was successful
+    // WooCommerce emails should still be sent as primary notification
   }
 }

@@ -304,6 +304,7 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
       billing: {
         first_name: orderData.address.firstName,
         last_name: orderData.address.lastName,
+        email: orderData.address.email,
         address_1: orderData.address.address1,
         address_2: orderData.address.address2 || '',
         city: orderData.address.city,
@@ -401,6 +402,35 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
 
     const order = await response.json();
     console.log('✅ WooCommerce order created via webhook:', order.id);
+
+    // Send order confirmation email via Resend (backup to WooCommerce emails)
+    try {
+      const { sendOrderConfirmationEmail: sendEmail } = await import('@/lib/send-email');
+
+      const subtotal = orderData.cartItems.reduce(
+        (sum: number, item: any) => sum + (item.price * item.quantity),
+        0
+      );
+      const total = subtotal + orderData.shipping.cost;
+
+      await sendEmail({
+        to: orderData.address.email,
+        customerName: `${orderData.address.firstName} ${orderData.address.lastName}`,
+        orderNumber: order.id.toString(),
+        orderData: {
+          cartItems: orderData.cartItems,
+          shipping: orderData.shipping,
+          total,
+          address: orderData.address,
+          paymentMethod: paymentDetails.method === 'card' || paymentDetails.method === 'upi' ? 'online' : 'cod'
+        }
+      });
+
+      console.log('✅ Order confirmation email sent via Resend from webhook for order:', order.id);
+    } catch (emailError) {
+      console.error('❌ Error sending email from webhook (non-critical):', emailError);
+      // Don't fail webhook processing if email fails
+    }
 
     return order.id.toString();
 
