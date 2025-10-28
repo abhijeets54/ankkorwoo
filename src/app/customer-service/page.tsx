@@ -138,25 +138,7 @@ const CustomerServiceContent = () => {
   ];
   
   return (
-    <div className="min-h-screen bg-[#f8f8f5]">
-      {/* Hero Section */}
-      <div className="relative h-[300px] overflow-hidden">
-        <Image
-          src="https://images.unsplash.com/photo-1560264280-88b68371db39?q=80"
-          alt="Customer Service"
-          fill
-          className="object-cover image-animate"
-        />
-        <div className="absolute inset-0 bg-[#2c2c27] bg-opacity-40 flex items-center justify-center">
-          <div className="text-center text-white max-w-3xl px-4">
-            <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">Customer Service</h1>
-            <p className="text-lg max-w-2xl mx-auto">
-              Dedicated to providing exceptional service and support for our valued customers
-            </p>
-          </div>
-        </div>
-      </div>
-      
+    <div className="min-h-screen bg-[#f8f8f5] pt-12">
       {/* Service Cards Section */}
       <motion.section 
         className="py-20 px-4"

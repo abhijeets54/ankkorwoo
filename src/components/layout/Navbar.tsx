@@ -82,28 +82,10 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-12 relative z-10">
-            {/* Collections Dropdown - IMPROVED: Smoother animation */}
-            <div className="group relative">
-              <button className="text-[#2c2c27] text-sm uppercase tracking-wider hover:text-[#8a8778] transition-colors py-2 px-1 flex items-center">
-                Collections
-              </button>
-              <div className="absolute left-1/2 transform -translate-x-1/2 pt-2 w-[220px] opacity-0 invisible translate-y-1 group-hover:translate-y-0 group-hover:opacity-100 group-hover:visible transition-all duration-200 ease-out">
-                <div className="bg-[#f8f8f5] border border-[#e5e2d9] rounded-md shadow-md p-2">
-                  <Link href="/collection/shirts" className="block text-[#2c2c27] hover:bg-[#f4f3f0] cursor-pointer py-2 px-4 rounded">
-                    Shirts
-                  </Link>
-                  {/* Commented out Polos menu item as per request
-                  <Link href="/collection/polos" className="block text-[#2c2c27] hover:bg-[#f4f3f0] cursor-pointer py-2 px-4 rounded">
-                    Polos (Coming Soon)
-                  </Link>
-                  */}
-                  <div className="h-px bg-[#e5e2d9] my-2"></div>
-                  <Link href="/collection" className="block text-[#2c2c27] hover:bg-[#f4f3f0] cursor-pointer py-2 px-4 rounded">
-                    View All Collections
-                  </Link>
-                </div>
-              </div>
-            </div>
+            {/* Collections Link */}
+            <Link href="/collection" className="text-[#2c2c27] text-sm uppercase tracking-wider hover:text-[#8a8778] transition-colors py-2 px-1">
+              Collections
+            </Link>
 
             <Link href="/about" className="text-[#2c2c27] text-sm uppercase tracking-wider hover:text-[#8a8778] transition-colors py-2 px-1">
               Heritage
@@ -225,24 +207,8 @@ const Navbar = () => {
                         <ul className="space-y-3">
                           <li>
                             <SheetClose asChild>
-                              <Link href="/collection/shirts" className="block text-[#2c2c27] hover:text-[#8a8778] transition-colors">
-                                Shirts
-                              </Link>
-                            </SheetClose>
-                          </li>
-                          {/* Commented out Polos menu item as per request
-                          <li>
-                            <SheetClose asChild>
-                              <Link href="/collection/polos" className="block text-[#2c2c27] hover:text-[#8a8778] transition-colors">
-                                Polos (Coming Soon)
-                              </Link>
-                            </SheetClose>
-                          </li>
-                          */}
-                          <li>
-                            <SheetClose asChild>
                               <Link href="/collection" className="block text-[#2c2c27] hover:text-[#8a8778] transition-colors">
-                                View All Collections
+                                Collections
                               </Link>
                             </SheetClose>
                           </li>

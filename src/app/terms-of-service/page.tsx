@@ -60,7 +60,7 @@ export default function TermsOfServicePage() {
               Shipping & Delivery
             </h2>
             <p className="mb-6">
-              We deliver across India through our shipping partners DTDC and Dehlivery. Orders are typically fulfilled within 5–7 business days. Shipping charges vary based on the delivery location and will be clearly displayed at checkout.
+              We deliver across India through our shipping partners. Orders are typically fulfilled within 5–7 business days. Shipping charges vary based on the delivery location and will be clearly displayed at checkout.
             </p>
             
             <div className="my-16 border-t border-b border-[#e5e2d9] py-8 px-6">

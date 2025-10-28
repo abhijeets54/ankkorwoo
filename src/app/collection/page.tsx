@@ -201,23 +201,6 @@ export default function CollectionPage() {
         </div>
       </div>
       
-      {/* Collection Banner */}
-      <div className="relative h-[300px] mb-16 overflow-hidden">
-        <Image
-          src="https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80"
-          alt="Ankkor Collection"
-          fill
-          sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover image-animate"
-        />
-        <div className="absolute inset-0 bg-[#2c2c27] bg-opacity-30 flex items-center justify-center">
-          <div className="text-center text-white">
-            <h2 className="text-3xl font-serif font-bold mb-4">Ankkor's Exclusive Collection</h2>
-            <p className="text-lg max-w-xl mx-auto">Timeless elegance for the modern gentleman</p>
-          </div>
-        </div>
-      </div>
-      
       {/* Filters and Products */}
       <div className="container mx-auto px-4">
         {/* Error message */}

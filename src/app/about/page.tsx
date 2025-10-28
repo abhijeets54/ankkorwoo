@@ -93,7 +93,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[#f8f8f5] overflow-hidden">
       {/* Hero Section - Luxury Treatment */}
-      <div className="relative h-[85vh] overflow-hidden">
+      <div className="relative min-h-[85vh] md:min-h-[90vh] lg:min-h-[95vh] w-full overflow-hidden">
         <motion.div 
           initial={{ scale: 1.1, opacity: 0.9 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -104,7 +104,9 @@ export default function AboutPage() {
             src="/ap1.png"
             alt="ANKKOR Heritage"
             fill
+            sizes="100vw"
             className="object-cover object-center"
+            quality={90}
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#2c2c27]/80 via-[#2c2c27]/20 to-[#2c2c27]/40"></div>

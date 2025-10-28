@@ -54,10 +54,6 @@ const faqData = [
       {
         question: 'What makes ANKKOR shirts special?',
         answer: 'Our shirts are crafted from 100% premium cotton, feature finest stitching, and are inspired by timeless old-money, vintage formal aesthetics. Each piece is made to offer elegance, class, and durability — just like an anchor.'
-      },
-      {
-        question: 'Can I personalize my order or gift it to someone?',
-        answer: 'Absolutely! We offer personalized gifting options starting from just ₹100. Whether it\'s for a friend, partner, or special occasion, we\'ve got you covered.'
       }
     ]
   },
@@ -114,10 +110,7 @@ const faqData = [
         question: 'What products do you currently offer?',
         answer: 'Currently, we offer formal shirts, with polos, pants, and accessories launching soon. Our products are designed for anyone who appreciates classy, old-money-inspired fashion.'
       },
-      {
-        question: 'How do I care for my ANKKOR shirt?',
-        answer: 'Each product comes with specific care instructions. We generally recommend gentle washing with mild detergent and avoiding harsh chemicals to maintain the premium fabric quality and appearance of your ANKKOR garments.'
-      },
+ 
       {
         question: 'How can I contact customer support?',
         answer: 'For any queries or assistance, you can reach us at supportankkor@gmail.com. We\'ll get back to you as soon as possible.'
