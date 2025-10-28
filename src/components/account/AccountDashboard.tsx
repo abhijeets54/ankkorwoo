@@ -158,12 +158,16 @@ interface CustomerData {
 }
 
 interface AccountDashboardProps {
-  // Remove customer prop since we'll get it from context
+  customerData?: any; // Optional customer data from parent
+  onRefresh?: () => void; // Optional refresh callback
 }
 
-const AccountDashboard: React.FC<AccountDashboardProps> = () => {
+const AccountDashboard: React.FC<AccountDashboardProps> = ({ customerData, onRefresh }) => {
   const router = useRouter();
-  const { customer, updateProfile, refreshCustomer } = useCustomer();
+  const { customer: contextCustomer, updateProfile, refreshCustomer } = useCustomer();
+
+  // Use provided customerData or fall back to context customer
+  const customer = customerData || contextCustomer;
 
   // Return loading state if customer is not available
   if (!customer) {

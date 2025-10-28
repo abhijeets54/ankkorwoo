@@ -16,7 +16,7 @@ export default function AccountPage() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/sign-in?redirect=/account');
+      router.push('/sign-in?redirect=/account-new');
     }
   }, [authLoading, isAuthenticated, router]);
 

@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { useLocalCartStore } from '@/lib/localCartStore';
 import { useCheckoutStore, ShippingAddress } from '@/lib/checkoutStore';
 import { useCustomer } from '@/components/providers/CustomerProvider';
-import { loadRazorpayScript, createRazorpayOrder, initializeRazorpayCheckout, verifyRazorpayPayment } from '@/lib/razorpay';
+import { loadRazorpayScript, createRazorpayOrder, verifyRazorpayPayment } from '@/lib/razorpay';
 import { getCODOrderBreakdown } from '@/lib/codPrepayment';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -274,19 +274,24 @@ export default function CheckoutPage() {
     console.log('Razorpay order created:', razorpayOrder.id);
 
     // Initialize Razorpay checkout
-    await initializeRazorpayCheckout({
+    if (typeof window === 'undefined' || !window.Razorpay) {
+      throw new Error('Razorpay SDK not loaded');
+    }
+
+    const razorpayInstance = new window.Razorpay({
       key: razorpayKeyId,
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
       name: 'Ankkor',
       description: `Full Payment - ${checkoutStore.cart.length} item(s)`,
       order_id: razorpayOrder.id,
-      handler: async (response) => {
+      handler: async (response: any) => {
         // Verify payment and create order
         console.log('Payment successful, verifying...', response);
         checkoutStore.setError(null);
 
         try {
+          console.log('Calling verify payment API...');
           const verificationResult = await verifyRazorpayPayment(response, {
             address: checkoutStore.shippingAddress,
             cartItems: checkoutStore.cart,
@@ -296,11 +301,14 @@ export default function CheckoutPage() {
           console.log('Payment verification result:', verificationResult);
 
           if (verificationResult.success) {
+            console.log('Payment verified successfully, order created:', verificationResult.orderId);
+
             // Clear cart and checkout state
             cartStore.clearCart();
             checkoutStore.clearCheckout();
 
             // Redirect to order confirmation
+            console.log('Redirecting to order confirmation page...');
             router.push(`/order-confirmed?id=${verificationResult.orderId}`);
           } else {
             throw new Error(verificationResult.message || 'Payment verification failed');
@@ -332,13 +340,15 @@ export default function CheckoutPage() {
         }
       }
     });
+
+    razorpayInstance.open();
   };
 
   const handleCODPrepayment = async (razorpayKeyId: string) => {
     // Create Razorpay order for ₹100 convenience fee only
     const convenienteFee = 100;
     console.log('Creating COD prepayment order for convenience fee:', convenienteFee);
-    
+
     const razorpayOrder = await createRazorpayOrder(
       convenienteFee,
       `cod_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
@@ -354,19 +364,24 @@ export default function CheckoutPage() {
     console.log('COD prepayment order created:', razorpayOrder.id);
 
     // Initialize Razorpay checkout for convenience fee
-    await initializeRazorpayCheckout({
+    if (typeof window === 'undefined' || !window.Razorpay) {
+      throw new Error('Razorpay SDK not loaded');
+    }
+
+    const razorpayInstance = new window.Razorpay({
       key: razorpayKeyId,
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
       name: 'Ankkor',
       description: `COD Convenience Fee - ₹${convenienteFee}`,
       order_id: razorpayOrder.id,
-      handler: async (response) => {
+      handler: async (response: any) => {
         // Verify COD prepayment and create order
         console.log('COD convenience fee payment successful, verifying...', response);
         checkoutStore.setError(null);
 
         try {
+          console.log('Calling COD verification API...');
           // Use special COD verification endpoint
           const verificationResult = await fetch('/api/razorpay/cod-prepayment', {
             method: 'POST',
@@ -392,11 +407,14 @@ export default function CheckoutPage() {
           console.log('COD prepayment verification result:', data);
 
           if (data.success) {
+            console.log('COD payment verified successfully, order created:', data.orderId);
+
             // Clear cart and checkout state
             cartStore.clearCart();
             checkoutStore.clearCheckout();
 
             // Redirect to order confirmation with COD info
+            console.log('Redirecting to order confirmation page...');
             router.push(`/order-confirmed?id=${data.orderId}&cod=true`);
           } else {
             throw new Error(data.message || 'COD prepayment verification failed');
@@ -428,6 +446,8 @@ export default function CheckoutPage() {
         }
       }
     });
+
+    razorpayInstance.open();
   };
 
   // Show loading while checking authentication

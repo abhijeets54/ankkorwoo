@@ -78,14 +78,26 @@ function OrderConfirmedContent() {
   const fetchOrderDetails = async (id: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response = await fetch(`/api/orders/${id}`, {
+      // Try GraphQL endpoint first
+      let response = await fetch(`/api/orders/${id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
+
+      // If GraphQL fails (e.g., authentication issues), try REST API endpoint
+      if (!response.ok) {
+        console.log('GraphQL endpoint failed, trying REST API endpoint...');
+        response = await fetch(`/api/orders-rest/${id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch order details');

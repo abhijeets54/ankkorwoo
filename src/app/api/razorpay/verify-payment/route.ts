@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { jwtDecode } from 'jwt-decode';
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
@@ -12,6 +14,23 @@ export async function POST(request: NextRequest) {
       cartItems,
       shipping
     } = body;
+
+    // Get customer ID from JWT token if available
+    let customerId: number | null = null;
+    try {
+      const cookieStore = cookies();
+      const authCookie = cookieStore.get('woo_auth_token');
+
+      if (authCookie && authCookie.value) {
+        const decodedToken = jwtDecode<{ data: { user: { id: string } } }>(authCookie.value);
+        if (decodedToken?.data?.user?.id) {
+          customerId = parseInt(decodedToken.data.user.id);
+          console.log('✅ Payment for customer ID:', customerId);
+        }
+      }
+    } catch (error: any) {
+      console.log('No customer ID found in token');
+    }
 
     // Validate required fields
     if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
@@ -137,6 +156,7 @@ export async function POST(request: NextRequest) {
       address,
       cartItems,
       shipping,
+      customerId,
       paymentDetails: {
         payment_id: razorpay_payment_id,
         order_id: razorpay_order_id,
@@ -182,7 +202,7 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
     const totalAmount = subtotal + orderData.shipping.cost;
 
     // Prepare order payload for WooCommerce REST API
-    const orderPayload = {
+    const orderPayload: any = {
       billing: {
         first_name: orderData.address.firstName,
         last_name: orderData.address.lastName,
@@ -210,21 +230,18 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
           quantity: item.quantity
         };
 
-        // Add variation_id if present
+        // Add variation_id if present and valid
         if (item.variationId) {
-          lineItem.variation_id = parseInt(item.variationId);
+          const variationIdInt = parseInt(item.variationId);
+          if (!isNaN(variationIdInt) && variationIdInt > 0) {
+            lineItem.variation_id = variationIdInt;
+          }
         }
 
-        // Add meta_data for attributes (size, etc.) if present
-        if (item.attributes && item.attributes.length > 0) {
-          lineItem.meta_data = item.attributes.map((attr: any) => ({
-            key: attr.name,
-            value: attr.value,
-            display_key: attr.name,
-            display_value: attr.value
-          }));
-        }
+        // Don't add meta_data - let WooCommerce handle variation attributes automatically
+        // Adding meta_data can cause "Invalid parameter" errors
 
+        console.log('Creating line item:', lineItem);
         return lineItem;
       }),
       shipping_lines: [{
@@ -235,8 +252,17 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
       payment_method: 'razorpay',
       payment_method_title: 'Razorpay',
       set_paid: true,
-      status: 'processing',
-      meta_data: [
+      status: 'processing'
+    };
+
+    // Add customer ID if available
+    if (orderData.customerId) {
+      orderPayload.customer_id = orderData.customerId;
+      console.log('✅ Associating order with customer ID:', orderData.customerId);
+    }
+
+    // Add metadata
+    orderPayload.meta_data = [
         {
           key: 'razorpay_payment_id',
           value: orderData.paymentDetails.payment_id
@@ -253,8 +279,7 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
           key: 'payment_gateway',
           value: 'razorpay_headless'
         }
-      ]
-    };
+      ];
 
     console.log('Creating WooCommerce order with payload:', JSON.stringify(orderPayload, null, 2));
 
@@ -273,8 +298,16 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('WooCommerce API error:', errorData);
-      throw new Error(`WooCommerce API error: ${errorData.message || response.statusText}`);
+      console.error('WooCommerce API error response:', JSON.stringify(errorData, null, 2));
+      console.error('WooCommerce API status:', response.status);
+
+      // Extract more detailed error information
+      let errorMessage = errorData.message || response.statusText;
+      if (errorData.data && errorData.data.params) {
+        errorMessage += ` - Invalid params: ${JSON.stringify(errorData.data.params)}`;
+      }
+
+      throw new Error(`WooCommerce API error: ${errorMessage}`);
     }
 
     const order = await response.json();

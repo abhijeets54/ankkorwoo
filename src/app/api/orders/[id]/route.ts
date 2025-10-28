@@ -127,11 +127,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   } catch (error: any) {
     console.error('Error fetching order details:', error);
-    
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response,
+      stack: error.stack
+    });
+
     return NextResponse.json(
-      { 
-        success: false, 
-        message: error.message || 'Failed to fetch order details' 
+      {
+        success: false,
+        message: error.message || 'Failed to fetch order details',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       },
       { status: 500 }
     );
