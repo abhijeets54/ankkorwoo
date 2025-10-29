@@ -99,7 +99,7 @@ export function generateOrderConfirmationEmail(data: OrderEmailData): string {
       </div>
 
       <p style="margin-top: 30px;">
-        If you have any questions about your order, please contact us at support@ankkor.in
+        If you have any questions about your order, please contact us at help.ankkor@gmail.com
       </p>
     </div>
 
