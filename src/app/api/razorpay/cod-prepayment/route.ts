@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
       razorpay_signature,
       address,
       cartItems,
-      shipping
+      shipping,
+      discount
     } = body;
 
     // Get customer ID from JWT token if available
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
       cartItems,
       shipping,
       customerId,
+      discount,
       paymentDetails: {
         payment_id: razorpay_payment_id,
         order_id: razorpay_order_id,
@@ -195,7 +197,9 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
       return total + (price * item.quantity);
     }, 0);
 
-    const codAmounts = calculateCODAmounts(subtotal, orderData.shipping.cost);
+    // Apply discount to subtotal before calculating COD amounts
+    const discountAmount = orderData.discount && orderData.discount.amount > 0 ? orderData.discount.amount : 0;
+    const codAmounts = calculateCODAmounts(subtotal, orderData.shipping.cost, discountAmount);
 
     // Prepare order payload for WooCommerce REST API
     const orderPayload: any = {
@@ -246,17 +250,33 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
         method_title: orderData.shipping.name,
         total: orderData.shipping.cost.toString()
       }],
-      // Add COD convenience fee as a fee line
-      fee_lines: [{
-        name: 'COD Convenience Fee',
-        total: '100.00',
-        tax_status: 'none'
-      }],
+      // Add COD convenience fee and discount as fee lines
+      fee_lines: [
+        {
+          name: 'COD Convenience Fee',
+          total: '100.00',
+          tax_status: 'none'
+        }
+      ],
       payment_method: 'cod_prepaid',
       payment_method_title: 'Cash on Delivery (Convenience Fee Paid)',
       set_paid: false, // Order not fully paid yet
       status: 'pending' // Set to pending until delivery
     };
+
+    // Add discount as a negative fee if present
+    if (orderData.discount && orderData.discount.amount > 0) {
+      orderPayload.fee_lines.push({
+        name: `Discount (${orderData.discount.code})`,
+        total: (-orderData.discount.amount).toString(),
+        tax_status: 'none'
+      });
+
+      console.log('Adding discount to COD order:', {
+        code: orderData.discount.code,
+        amount: orderData.discount.amount
+      });
+    }
 
     // Add customer ID if available
     if (orderData.customerId) {
@@ -307,6 +327,20 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
           value: `Customer has paid ₹100 convenience fee online. Collect ₹${codAmounts.codAmount} cash on delivery.`
         }
       ];
+
+    // Add discount metadata if applied
+    if (orderData.discount && orderData.discount.amount > 0) {
+      orderPayload.meta_data.push(
+        {
+          key: 'discount_code',
+          value: orderData.discount.code
+        },
+        {
+          key: 'discount_amount',
+          value: orderData.discount.amount.toString()
+        }
+      );
+    }
 
     console.log('Creating COD WooCommerce order with payload:', JSON.stringify(orderPayload, null, 2));
 

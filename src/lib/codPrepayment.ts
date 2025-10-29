@@ -28,18 +28,20 @@ export interface CODCheckoutData {
  * Calculate COD amounts
  * @param subtotal Order subtotal
  * @param shippingCost Shipping cost
+ * @param discountAmount Discount amount (if any)
  * @returns COD payment breakdown
  */
-export const calculateCODAmounts = (subtotal: number, shippingCost: number = 0) => {
+export const calculateCODAmounts = (subtotal: number, shippingCost: number = 0, discountAmount: number = 0) => {
   const CONVENIENCE_FEE = 100; // ₹100 fixed convenience fee
-  const totalOrderAmount = subtotal + shippingCost;
-  
+  const totalOrderAmount = subtotal + shippingCost - discountAmount; // Apply discount
+
   return {
     totalOrderAmount,
     convenienteFee: CONVENIENCE_FEE,
     prepaidAmount: CONVENIENCE_FEE, // Customer pays ₹100 online
     codAmount: totalOrderAmount, // Customer pays full order amount on delivery
-    totalCost: totalOrderAmount + CONVENIENCE_FEE // What customer pays in total
+    totalCost: totalOrderAmount + CONVENIENCE_FEE, // What customer pays in total
+    discountAmount // Return discount amount for reference
   };
 };
 

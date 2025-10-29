@@ -12,7 +12,8 @@ export async function POST(request: NextRequest) {
       razorpay_signature,
       address,
       cartItems,
-      shipping
+      shipping,
+      discount
     } = body;
 
     // Get customer ID from JWT token if available
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ SECURITY: Verify payment amount matches expected amount
-    const expectedAmount = calculateExpectedAmount(cartItems, shipping);
+    const expectedAmount = calculateExpectedAmount(cartItems, shipping, discount);
     const paidAmount = payment.amount / 100; // Convert paise to rupees
 
     // Allow 1 rupee tolerance for floating point errors
@@ -132,7 +133,8 @@ export async function POST(request: NextRequest) {
       console.error('Payment amount mismatch:', {
         expected: expectedAmount,
         paid: paidAmount,
-        difference: Math.abs(paidAmount - expectedAmount)
+        difference: Math.abs(paidAmount - expectedAmount),
+        discount: discount
       });
 
       return NextResponse.json(
@@ -157,6 +159,7 @@ export async function POST(request: NextRequest) {
       cartItems,
       shipping,
       customerId,
+      discount,
       paymentDetails: {
         payment_id: razorpay_payment_id,
         order_id: razorpay_order_id,
@@ -272,6 +275,20 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
       status: 'processing'
     };
 
+    // Add discount as fee line (negative fee) if discount is applied
+    if (orderData.discount && orderData.discount.amount > 0) {
+      orderPayload.fee_lines = [{
+        name: `Discount (${orderData.discount.code})`,
+        total: (-orderData.discount.amount).toString(), // Negative value for discount
+        tax_status: 'none'
+      }];
+
+      console.log('Adding discount to order:', {
+        code: orderData.discount.code,
+        amount: orderData.discount.amount
+      });
+    }
+
     // Add customer ID if available
     if (orderData.customerId) {
       orderPayload.customer_id = orderData.customerId;
@@ -297,6 +314,20 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
           value: 'razorpay_headless'
         }
       ];
+
+    // Add discount metadata if applied
+    if (orderData.discount && orderData.discount.amount > 0) {
+      orderPayload.meta_data.push(
+        {
+          key: 'discount_code',
+          value: orderData.discount.code
+        },
+        {
+          key: 'discount_amount',
+          value: orderData.discount.amount.toString()
+        }
+      );
+    }
 
     console.log('Creating WooCommerce order with payload:', JSON.stringify(orderPayload, null, 2));
 
@@ -345,7 +376,7 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
  * Calculate expected order amount from cart items and shipping
  * This prevents price manipulation attacks
  */
-function calculateExpectedAmount(cartItems: any[], shipping: any): number {
+function calculateExpectedAmount(cartItems: any[], shipping: any, discount?: any): number {
   const subtotal = cartItems.reduce((total: number, item: any) => {
     const price = typeof item.price === 'string'
       ? parseFloat(item.price.replace(/[₹$€£,]/g, '').trim())
@@ -354,7 +385,12 @@ function calculateExpectedAmount(cartItems: any[], shipping: any): number {
   }, 0);
 
   const shippingCost = shipping.cost || 0;
-  const totalAmount = subtotal + shippingCost;
+  let totalAmount = subtotal + shippingCost;
+
+  // Apply discount if present
+  if (discount && discount.amount > 0) {
+    totalAmount -= discount.amount;
+  }
 
   return Math.round(totalAmount * 100) / 100; // Round to 2 decimal places
 }

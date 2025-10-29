@@ -209,50 +209,73 @@ export const useCheckoutStore = create<CheckoutState>()(
       },
 
       setDiscountCode: (code) => {
-        // Only update the code and reset error state
-        set({ 
-          discountCode: code,
-          showDiscountError: false 
-        });
+        // If code is empty, clear discount completely
+        if (!code || code.trim() === '') {
+          set({
+            discountCode: '',
+            discountAmount: 0,
+            isDiscountValid: false,
+            showDiscountError: false
+          });
+          get().calculateFinalAmount();
+        } else {
+          // Only update the code and reset error state
+          set({
+            discountCode: code,
+            showDiscountError: false
+          });
+        }
       },
 
       applyDiscount: () => {
-        const { 
-          discountCode, 
-          subtotal, 
-          shippingCost, 
+        const {
+          discountCode,
+          subtotal,
+          shippingCost,
           selectedShipping,
           shippingAddress,
           isLoadingShipping
         } = get();
-        
+
         // Validate all required information is available
         if (!selectedShipping || !shippingAddress || isLoadingShipping) {
-          set({ 
+          set({
             isDiscountValid: false,
             discountAmount: 0,
             showDiscountError: true
           });
           return;
         }
-        
+
         const subtotalWithShipping = subtotal + shippingCost;
-        
-        // Use exact string comparison, no case conversion
-        if (discountCode === 'ANKKOR10' || discountCode === '210123') {
-          // Calculate discount based on code
-          const discountPercentage = discountCode === 'ANKKOR10' ? 0.1 : 0.99;
-          const discountAmount = Math.round((subtotalWithShipping * discountPercentage) * 100) / 100;
+
+        // Frontend-only discount validation
+        // Validate exact match (case-sensitive)
+        if (discountCode === 'ANKKOR10') {
+          // 10% discount
+          const discountAmount = Math.round((subtotalWithShipping * 0.10) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
-          
-          set({ 
+
+          set({
+            isDiscountValid: true,
+            discountAmount,
+            finalAmount,
+            showDiscountError: false
+          });
+        } else if (discountCode === '210123') {
+          // 99% discount
+          const discountAmount = Math.round((subtotalWithShipping * 0.99) * 100) / 100;
+          const finalAmount = subtotalWithShipping - discountAmount;
+
+          set({
             isDiscountValid: true,
             discountAmount,
             finalAmount,
             showDiscountError: false
           });
         } else {
-          set({ 
+          // Invalid code
+          set({
             isDiscountValid: false,
             discountAmount: 0,
             showDiscountError: true

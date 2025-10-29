@@ -188,6 +188,10 @@ export const verifyRazorpayPayment = async (
     address: any;
     cartItems: any[];
     shipping: any;
+    discount?: {
+      code: string;
+      amount: number;
+    } | null;
   }
 ): Promise<PaymentVerificationResponse> => {
   try {
@@ -203,6 +207,7 @@ export const verifyRazorpayPayment = async (
         address: orderData.address,
         cartItems: orderData.cartItems,
         shipping: orderData.shipping,
+        discount: orderData.discount,
       }),
     });
 

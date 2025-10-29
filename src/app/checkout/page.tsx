@@ -312,6 +312,10 @@ export default function CheckoutPage() {
             address: checkoutStore.shippingAddress,
             cartItems: checkoutStore.cart,
             shipping: checkoutStore.selectedShipping,
+            discount: checkoutStore.isDiscountValid ? {
+              code: checkoutStore.discountCode,
+              amount: checkoutStore.discountAmount
+            } : null,
           });
 
           console.log('Payment verification result:', verificationResult);
@@ -418,6 +422,10 @@ export default function CheckoutPage() {
               address: checkoutStore.shippingAddress,
               cartItems: checkoutStore.cart,
               shipping: checkoutStore.selectedShipping,
+              discount: checkoutStore.isDiscountValid ? {
+                code: checkoutStore.discountCode,
+                amount: checkoutStore.discountAmount
+              } : null,
             }),
           });
 
@@ -730,14 +738,35 @@ export default function CheckoutPage() {
               </div>
               
               {checkoutStore.showDiscountError && !checkoutStore.isDiscountValid && (
-                <p className="text-sm text-red-500 mt-2">Invalid discount code</p>
+                <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700 font-medium">❌ Invalid discount code</p>
+                  <p className="text-xs text-red-600 mt-1">Please check the code and try again.</p>
+                </div>
               )}
               {checkoutStore.isDiscountValid && (
-                <p className="text-sm text-green-600 mt-2">
-                  {checkoutStore.discountCode === 'ANKKOR10' 
-                    ? '10% discount applied successfully!' 
-                    : '99% discount applied successfully!'}
-                </p>
+                <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm text-green-700 font-medium">
+                        ✅ {checkoutStore.discountCode === 'ANKKOR10'
+                          ? '10% discount applied!'
+                          : '99% discount applied!'}
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        You saved ₹{checkoutStore.discountAmount.toFixed(2)} on this order
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        checkoutStore.setDiscountCode('');
+                        checkoutStore.calculateFinalAmount();
+                      }}
+                      className="text-xs text-red-600 hover:text-red-700 underline ml-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
