@@ -241,12 +241,34 @@ export const useCheckoutStore = create<CheckoutState>()(
           isLoadingShipping
         } = get();
 
+        console.log('🔍 Applying discount code:', {
+          rawCode: discountCode,
+          subtotal,
+          shippingCost,
+          hasShipping: !!selectedShipping,
+          hasAddress: !!shippingAddress,
+          isLoading: isLoadingShipping
+        });
+
         // Validate all required information is available
         if (!selectedShipping || !shippingAddress || isLoadingShipping) {
+          console.log('❌ Missing required info for discount');
           set({
             isDiscountValid: false,
             discountAmount: 0,
             showDiscountError: true
+          });
+          return;
+        }
+
+        // Check if discount code is empty after trimming
+        if (!discountCode || discountCode.trim() === '') {
+          console.log('❌ Empty discount code');
+          set({
+            isDiscountValid: false,
+            discountAmount: 0,
+            showDiscountError: true,
+            appliedDiscountCode: ''
           });
           return;
         }
@@ -257,11 +279,24 @@ export const useCheckoutStore = create<CheckoutState>()(
         // This handles mobile keyboard issues (trailing spaces, autocorrect, autocapitalize)
         const normalizedCode = discountCode.trim().toUpperCase();
 
+        console.log('🔄 Normalized code:', {
+          original: discountCode,
+          normalized: normalizedCode,
+          length: normalizedCode.length,
+          chars: Array.from(normalizedCode).map(c => `${c}(${c.charCodeAt(0)})`)
+        });
+
         // Frontend-only discount validation
         if (normalizedCode === 'ANKKOR10') {
           // 10% discount
           const discountAmount = Math.round((subtotalWithShipping * 0.10) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
+
+          console.log('✅ ANKKOR10 applied:', {
+            subtotalWithShipping,
+            discountAmount,
+            finalAmount
+          });
 
           set({
             isDiscountValid: true,
@@ -275,6 +310,12 @@ export const useCheckoutStore = create<CheckoutState>()(
           const discountAmount = Math.round((subtotalWithShipping * 0.99) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
 
+          console.log('✅ 210123 applied:', {
+            subtotalWithShipping,
+            discountAmount,
+            finalAmount
+          });
+
           set({
             isDiscountValid: true,
             discountAmount,
@@ -284,6 +325,7 @@ export const useCheckoutStore = create<CheckoutState>()(
           });
         } else {
           // Invalid code
+          console.log('❌ Invalid discount code:', normalizedCode);
           set({
             isDiscountValid: false,
             discountAmount: 0,

@@ -688,57 +688,80 @@ export default function CheckoutPage() {
                 Discount Code
               </h2>
               
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder={
-                    !state
-                      ? "First select state and calculate shipping"
-                      : checkoutStore.isLoadingShipping
-                      ? "Calculating shipping..."
-                      : !firstName || !lastName || !email || !address1 || !city || !pincode || !phone
-                      ? "Fill shipping details first"
-                      : "Enter discount code"
-                  }
-                  value={checkoutStore.discountCode}
-                  onChange={(e) => checkoutStore.setDiscountCode(e.target.value)}
-                  disabled={
-                    !firstName ||
-                    !lastName ||
-                    !email ||
-                    !address1 ||
-                    !city ||
-                    !state ||
-                    !pincode ||
-                    !phone ||
-                    checkoutStore.isLoadingShipping
-                  }
-                  className="flex-1"
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck="false"
-                />
-                <Button 
-                  onClick={() => checkoutStore.applyDiscount()}
-                  variant="outline"
-                  type="button"
-                  disabled={
-                    !checkoutStore.discountCode || 
-                    !checkoutStore.selectedShipping ||
-                    !firstName ||
-                    !lastName ||
-                    !email ||
-                    !address1 ||
-                    !city ||
-                    !state ||
-                    !pincode ||
-                    !phone ||
-                    checkoutStore.isLoadingShipping
-                  }
-                >
-                  {checkoutStore.isLoadingShipping ? 'Calculating...' : 'Apply'}
-                </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder={
+                      !state
+                        ? "First select state and calculate shipping"
+                        : checkoutStore.isLoadingShipping
+                        ? "Calculating shipping..."
+                        : !firstName || !lastName || !email || !address1 || !city || !pincode || !phone
+                        ? "Fill shipping details first"
+                        : "Enter discount code (e.g., ANKKOR10)"
+                    }
+                    value={checkoutStore.discountCode}
+                    onChange={(e) => {
+                      // Convert to uppercase and trim in real-time for better UX
+                      const value = e.target.value.toUpperCase().trim();
+                      console.log('📝 Input changed:', {
+                        original: e.target.value,
+                        processed: value,
+                        length: value.length
+                      });
+                      checkoutStore.setDiscountCode(value);
+                    }}
+                    disabled={
+                      !firstName ||
+                      !lastName ||
+                      !email ||
+                      !address1 ||
+                      !city ||
+                      !state ||
+                      !pincode ||
+                      !phone ||
+                      checkoutStore.isLoadingShipping
+                    }
+                    className="flex-1 uppercase"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    inputMode="text"
+                  />
+                  <Button
+                    onClick={() => {
+                      console.log('🔘 Apply button clicked');
+                      checkoutStore.applyDiscount();
+                    }}
+                    variant="outline"
+                    type="button"
+                    disabled={
+                      !checkoutStore.discountCode ||
+                      checkoutStore.discountCode.trim() === '' ||
+                      !checkoutStore.selectedShipping ||
+                      !firstName ||
+                      !lastName ||
+                      !email ||
+                      !address1 ||
+                      !city ||
+                      !state ||
+                      !pincode ||
+                      !phone ||
+                      checkoutStore.isLoadingShipping
+                    }
+                  >
+                    {checkoutStore.isLoadingShipping ? 'Calculating...' : 'Apply'}
+                  </Button>
+                </div>
+
+                {/* Debug helper - remove after fixing */}
+                {checkoutStore.discountCode && (
+                  <div className="text-xs text-gray-500 font-mono">
+                    Code: "{checkoutStore.discountCode}" (length: {checkoutStore.discountCode.length})
+                  </div>
+                )}
               </div>
               
               {checkoutStore.showDiscountError && !checkoutStore.isDiscountValid && (
