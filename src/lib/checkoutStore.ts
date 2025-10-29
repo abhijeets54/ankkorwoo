@@ -59,6 +59,8 @@ interface CheckoutState {
   isDiscountValid: boolean;
   showDiscountError: boolean;
   appliedDiscountCode: string; // The normalized code that was actually applied
+  discountType: string; // The type of discount (percent, fixed_cart, etc)
+  discountPercentage: number; // The percentage value for display
   
   // Loading states
   isLoadingShipping: boolean;
@@ -97,6 +99,8 @@ export const useCheckoutStore = create<CheckoutState>()(
       isDiscountValid: false,
       showDiscountError: false,
       appliedDiscountCode: '',
+      discountType: '',
+      discountPercentage: 0,
       isLoadingShipping: false,
       isProcessingPayment: false,
       error: null,
@@ -205,6 +209,8 @@ export const useCheckoutStore = create<CheckoutState>()(
           isDiscountValid: false,
           showDiscountError: false,
           appliedDiscountCode: '',
+          discountType: '',
+          discountPercentage: 0,
           isLoadingShipping: false,
           isProcessingPayment: false,
           error: null,
@@ -219,7 +225,9 @@ export const useCheckoutStore = create<CheckoutState>()(
             discountAmount: 0,
             isDiscountValid: false,
             showDiscountError: false,
-            appliedDiscountCode: ''
+            appliedDiscountCode: '',
+            discountType: '',
+            discountPercentage: 0
           });
           get().calculateFinalAmount();
         } else {
@@ -231,7 +239,7 @@ export const useCheckoutStore = create<CheckoutState>()(
         }
       },
 
-      applyDiscount: () => {
+      applyDiscount: async () => {
         const {
           discountCode,
           subtotal,
@@ -275,92 +283,78 @@ export const useCheckoutStore = create<CheckoutState>()(
 
         const subtotalWithShipping = subtotal + shippingCost;
 
-        // Normalize the discount code: trim whitespace and convert to uppercase
-        // Remove ALL whitespace (not just trim) and normalize Unicode
-        const normalizedCode = discountCode
-          .replace(/\s+/g, '') // Remove all whitespace including invisible chars
-          .normalize('NFC')     // Normalize Unicode characters
-          .toUpperCase();
+        // Set loading state
+        set({ isLoadingShipping: true });
 
-        console.log('🔄 Normalized code:', {
-          original: discountCode,
-          afterReplace: discountCode.replace(/\s+/g, ''),
-          normalized: normalizedCode,
-          length: normalizedCode.length,
-          chars: Array.from(normalizedCode).map(c => `${c}(${c.charCodeAt(0)})`),
-          // Check exact match
-          isANKKOR10: normalizedCode === 'ANKKOR10',
-          is210123: normalizedCode === '210123'
-        });
+        try {
+          console.log('🌐 Validating coupon with WooCommerce API...');
 
-        // Frontend-only discount validation
-        // Use explicit character code comparison as backup
-        const isAnkkor10 = normalizedCode === 'ANKKOR10' ||
-                          (normalizedCode.length === 8 &&
-                           normalizedCode.charCodeAt(0) === 65 && // A
-                           normalizedCode.charCodeAt(1) === 78 && // N
-                           normalizedCode.charCodeAt(2) === 75 && // K
-                           normalizedCode.charCodeAt(3) === 75 && // K
-                           normalizedCode.charCodeAt(4) === 79 && // O
-                           normalizedCode.charCodeAt(5) === 82 && // R
-                           normalizedCode.charCodeAt(6) === 49 && // 1
-                           normalizedCode.charCodeAt(7) === 48);  // 0
-
-        const is210123 = normalizedCode === '210123' ||
-                        (normalizedCode.length === 6 &&
-                         normalizedCode.charCodeAt(0) === 50 && // 2
-                         normalizedCode.charCodeAt(1) === 49 && // 1
-                         normalizedCode.charCodeAt(2) === 48 && // 0
-                         normalizedCode.charCodeAt(3) === 49 && // 1
-                         normalizedCode.charCodeAt(4) === 50 && // 2
-                         normalizedCode.charCodeAt(5) === 51);  // 3
-
-        console.log('🔍 Validation checks:', { isAnkkor10, is210123 });
-
-        if (isAnkkor10) {
-          // 10% discount
-          const discountAmount = Math.round((subtotalWithShipping * 0.10) * 100) / 100;
-          const finalAmount = subtotalWithShipping - discountAmount;
-
-          console.log('✅ ANKKOR10 applied:', {
-            subtotalWithShipping,
-            discountAmount,
-            finalAmount
+          // Call backend API to validate coupon with WooCommerce
+          const response = await fetch('/api/validate-coupon', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code: discountCode.trim(),
+              cartTotal: subtotalWithShipping,
+              customerEmail: shippingAddress.email
+            })
           });
 
-          set({
-            isDiscountValid: true,
-            discountAmount,
-            finalAmount,
-            showDiscountError: false,
-            appliedDiscountCode: normalizedCode
-          });
-        } else if (is210123) {
-          // 99% discount
-          const discountAmount = Math.round((subtotalWithShipping * 0.99) * 100) / 100;
-          const finalAmount = subtotalWithShipping - discountAmount;
+          const data = await response.json();
 
-          console.log('✅ 210123 applied:', {
-            subtotalWithShipping,
-            discountAmount,
-            finalAmount
-          });
+          console.log('📦 API Response:', data);
 
-          set({
-            isDiscountValid: true,
-            discountAmount,
-            finalAmount,
-            showDiscountError: false,
-            appliedDiscountCode: normalizedCode
-          });
-        } else {
-          // Invalid code
-          console.log('❌ Invalid discount code:', normalizedCode);
+          if (data.valid && data.coupon) {
+            // Coupon is valid - apply the discount
+            const discountAmount = data.coupon.discountAmount;
+            const finalAmount = subtotalWithShipping - discountAmount;
+
+            console.log('✅ Coupon applied:', {
+              code: data.coupon.code,
+              type: data.coupon.discountType,
+              amount: data.coupon.amount,
+              discountAmount,
+              finalAmount
+            });
+
+            set({
+              isDiscountValid: true,
+              discountAmount,
+              finalAmount,
+              showDiscountError: false,
+              appliedDiscountCode: data.coupon.code,
+              discountType: data.coupon.discountType,
+              discountPercentage: data.coupon.discountType === 'percent' ? data.coupon.amount : 0,
+              isLoadingShipping: false
+            });
+          } else {
+            // Invalid coupon
+            console.log('❌ Invalid coupon:', data.message);
+            set({
+              isDiscountValid: false,
+              discountAmount: 0,
+              showDiscountError: true,
+              appliedDiscountCode: '',
+              discountType: '',
+              discountPercentage: 0,
+              isLoadingShipping: false,
+              error: data.message || 'Invalid discount code'
+            });
+            get().calculateFinalAmount();
+          }
+        } catch (error) {
+          console.error('❌ Error validating coupon:', error);
           set({
             isDiscountValid: false,
             discountAmount: 0,
             showDiscountError: true,
-            appliedDiscountCode: ''
+            appliedDiscountCode: '',
+            discountType: '',
+            discountPercentage: 0,
+            isLoadingShipping: false,
+            error: 'Failed to validate coupon. Please try again.'
           });
           get().calculateFinalAmount();
         }

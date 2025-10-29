@@ -264,15 +264,13 @@ async function createCODWooCommerceOrder(orderData: any): Promise<string> {
       status: 'pending' // Set to pending until delivery
     };
 
-    // Add discount as a negative fee if present
-    if (orderData.discount && orderData.discount.amount > 0) {
-      orderPayload.fee_lines.push({
-        name: `Discount (${orderData.discount.code})`,
-        total: (-orderData.discount.amount).toString(),
-        tax_status: 'none'
-      });
+    // Add discount using coupon_lines (official WooCommerce method)
+    if (orderData.discount && orderData.discount.code) {
+      orderPayload.coupon_lines = [{
+        code: orderData.discount.code
+      }];
 
-      console.log('Adding discount to COD order:', {
+      console.log('Adding coupon to COD order:', {
         code: orderData.discount.code,
         amount: orderData.discount.amount
       });

@@ -775,9 +775,9 @@ export default function CheckoutPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="text-sm text-green-700 font-medium">
-                        ✅ {checkoutStore.appliedDiscountCode === 'ANKKOR10'
-                          ? '10% discount applied!'
-                          : '99% discount applied!'}
+                        ✅ {checkoutStore.discountType === 'percent'
+                          ? `${checkoutStore.discountPercentage}% discount applied!`
+                          : `₹${checkoutStore.discountAmount.toFixed(2)} discount applied!`}
                       </p>
                       <p className="text-xs text-green-600 mt-1">
                         Code: <span className="font-mono font-semibold">{checkoutStore.appliedDiscountCode}</span> • You saved ₹{checkoutStore.discountAmount.toFixed(2)}

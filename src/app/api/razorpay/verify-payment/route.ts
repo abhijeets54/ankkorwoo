@@ -275,15 +275,13 @@ async function createWooCommerceOrder(orderData: any): Promise<string> {
       status: 'processing'
     };
 
-    // Add discount as fee line (negative fee) if discount is applied
-    if (orderData.discount && orderData.discount.amount > 0) {
-      orderPayload.fee_lines = [{
-        name: `Discount (${orderData.discount.code})`,
-        total: (-orderData.discount.amount).toString(), // Negative value for discount
-        tax_status: 'none'
+    // Add discount using coupon_lines (official WooCommerce method)
+    if (orderData.discount && orderData.discount.code) {
+      orderPayload.coupon_lines = [{
+        code: orderData.discount.code
       }];
 
-      console.log('Adding discount to order:', {
+      console.log('Adding coupon to order:', {
         code: orderData.discount.code,
         amount: orderData.discount.amount
       });
