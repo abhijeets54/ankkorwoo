@@ -276,18 +276,48 @@ export const useCheckoutStore = create<CheckoutState>()(
         const subtotalWithShipping = subtotal + shippingCost;
 
         // Normalize the discount code: trim whitespace and convert to uppercase
-        // This handles mobile keyboard issues (trailing spaces, autocorrect, autocapitalize)
-        const normalizedCode = discountCode.trim().toUpperCase();
+        // Remove ALL whitespace (not just trim) and normalize Unicode
+        const normalizedCode = discountCode
+          .replace(/\s+/g, '') // Remove all whitespace including invisible chars
+          .normalize('NFC')     // Normalize Unicode characters
+          .toUpperCase();
 
         console.log('🔄 Normalized code:', {
           original: discountCode,
+          afterReplace: discountCode.replace(/\s+/g, ''),
           normalized: normalizedCode,
           length: normalizedCode.length,
-          chars: Array.from(normalizedCode).map(c => `${c}(${c.charCodeAt(0)})`)
+          chars: Array.from(normalizedCode).map(c => `${c}(${c.charCodeAt(0)})`),
+          // Check exact match
+          isANKKOR10: normalizedCode === 'ANKKOR10',
+          is210123: normalizedCode === '210123'
         });
 
         // Frontend-only discount validation
-        if (normalizedCode === 'ANKKOR10') {
+        // Use explicit character code comparison as backup
+        const isAnkkor10 = normalizedCode === 'ANKKOR10' ||
+                          (normalizedCode.length === 8 &&
+                           normalizedCode.charCodeAt(0) === 65 && // A
+                           normalizedCode.charCodeAt(1) === 78 && // N
+                           normalizedCode.charCodeAt(2) === 75 && // K
+                           normalizedCode.charCodeAt(3) === 75 && // K
+                           normalizedCode.charCodeAt(4) === 79 && // O
+                           normalizedCode.charCodeAt(5) === 82 && // R
+                           normalizedCode.charCodeAt(6) === 49 && // 1
+                           normalizedCode.charCodeAt(7) === 48);  // 0
+
+        const is210123 = normalizedCode === '210123' ||
+                        (normalizedCode.length === 6 &&
+                         normalizedCode.charCodeAt(0) === 50 && // 2
+                         normalizedCode.charCodeAt(1) === 49 && // 1
+                         normalizedCode.charCodeAt(2) === 48 && // 0
+                         normalizedCode.charCodeAt(3) === 49 && // 1
+                         normalizedCode.charCodeAt(4) === 50 && // 2
+                         normalizedCode.charCodeAt(5) === 51);  // 3
+
+        console.log('🔍 Validation checks:', { isAnkkor10, is210123 });
+
+        if (isAnkkor10) {
           // 10% discount
           const discountAmount = Math.round((subtotalWithShipping * 0.10) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
@@ -305,7 +335,7 @@ export const useCheckoutStore = create<CheckoutState>()(
             showDiscountError: false,
             appliedDiscountCode: normalizedCode
           });
-        } else if (normalizedCode === '210123') {
+        } else if (is210123) {
           // 99% discount
           const discountAmount = Math.round((subtotalWithShipping * 0.99) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
