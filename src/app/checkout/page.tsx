@@ -313,7 +313,7 @@ export default function CheckoutPage() {
             cartItems: checkoutStore.cart,
             shipping: checkoutStore.selectedShipping,
             discount: checkoutStore.isDiscountValid ? {
-              code: checkoutStore.discountCode,
+              code: checkoutStore.appliedDiscountCode,
               amount: checkoutStore.discountAmount
             } : null,
           });
@@ -423,7 +423,7 @@ export default function CheckoutPage() {
               cartItems: checkoutStore.cart,
               shipping: checkoutStore.selectedShipping,
               discount: checkoutStore.isDiscountValid ? {
-                code: checkoutStore.discountCode,
+                code: checkoutStore.appliedDiscountCode,
                 amount: checkoutStore.discountAmount
               } : null,
             }),
@@ -692,7 +692,7 @@ export default function CheckoutPage() {
                 <Input
                   type="text"
                   placeholder={
-                    !state 
+                    !state
                       ? "First select state and calculate shipping"
                       : checkoutStore.isLoadingShipping
                       ? "Calculating shipping..."
@@ -714,6 +714,10 @@ export default function CheckoutPage() {
                     checkoutStore.isLoadingShipping
                   }
                   className="flex-1"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
                 />
                 <Button 
                   onClick={() => checkoutStore.applyDiscount()}
@@ -748,12 +752,12 @@ export default function CheckoutPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="text-sm text-green-700 font-medium">
-                        ✅ {checkoutStore.discountCode === 'ANKKOR10'
+                        ✅ {checkoutStore.appliedDiscountCode === 'ANKKOR10'
                           ? '10% discount applied!'
                           : '99% discount applied!'}
                       </p>
                       <p className="text-xs text-green-600 mt-1">
-                        You saved ₹{checkoutStore.discountAmount.toFixed(2)} on this order
+                        Code: <span className="font-mono font-semibold">{checkoutStore.appliedDiscountCode}</span> • You saved ₹{checkoutStore.discountAmount.toFixed(2)}
                       </p>
                     </div>
                     <button

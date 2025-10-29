@@ -58,6 +58,7 @@ interface CheckoutState {
   discountAmount: number;
   isDiscountValid: boolean;
   showDiscountError: boolean;
+  appliedDiscountCode: string; // The normalized code that was actually applied
   
   // Loading states
   isLoadingShipping: boolean;
@@ -95,6 +96,7 @@ export const useCheckoutStore = create<CheckoutState>()(
       discountAmount: 0,
       isDiscountValid: false,
       showDiscountError: false,
+      appliedDiscountCode: '',
       isLoadingShipping: false,
       isProcessingPayment: false,
       error: null,
@@ -202,6 +204,7 @@ export const useCheckoutStore = create<CheckoutState>()(
           discountAmount: 0,
           isDiscountValid: false,
           showDiscountError: false,
+          appliedDiscountCode: '',
           isLoadingShipping: false,
           isProcessingPayment: false,
           error: null,
@@ -215,7 +218,8 @@ export const useCheckoutStore = create<CheckoutState>()(
             discountCode: '',
             discountAmount: 0,
             isDiscountValid: false,
-            showDiscountError: false
+            showDiscountError: false,
+            appliedDiscountCode: ''
           });
           get().calculateFinalAmount();
         } else {
@@ -249,9 +253,12 @@ export const useCheckoutStore = create<CheckoutState>()(
 
         const subtotalWithShipping = subtotal + shippingCost;
 
+        // Normalize the discount code: trim whitespace and convert to uppercase
+        // This handles mobile keyboard issues (trailing spaces, autocorrect, autocapitalize)
+        const normalizedCode = discountCode.trim().toUpperCase();
+
         // Frontend-only discount validation
-        // Validate exact match (case-sensitive)
-        if (discountCode === 'ANKKOR10') {
+        if (normalizedCode === 'ANKKOR10') {
           // 10% discount
           const discountAmount = Math.round((subtotalWithShipping * 0.10) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
@@ -260,9 +267,10 @@ export const useCheckoutStore = create<CheckoutState>()(
             isDiscountValid: true,
             discountAmount,
             finalAmount,
-            showDiscountError: false
+            showDiscountError: false,
+            appliedDiscountCode: normalizedCode
           });
-        } else if (discountCode === '210123') {
+        } else if (normalizedCode === '210123') {
           // 99% discount
           const discountAmount = Math.round((subtotalWithShipping * 0.99) * 100) / 100;
           const finalAmount = subtotalWithShipping - discountAmount;
@@ -271,14 +279,16 @@ export const useCheckoutStore = create<CheckoutState>()(
             isDiscountValid: true,
             discountAmount,
             finalAmount,
-            showDiscountError: false
+            showDiscountError: false,
+            appliedDiscountCode: normalizedCode
           });
         } else {
           // Invalid code
           set({
             isDiscountValid: false,
             discountAmount: 0,
-            showDiscountError: true
+            showDiscountError: true,
+            appliedDiscountCode: ''
           });
           get().calculateFinalAmount();
         }
