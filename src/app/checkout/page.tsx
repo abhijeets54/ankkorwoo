@@ -59,7 +59,26 @@ export default function CheckoutPage() {
   const lastName = watch('lastName');
   const email = watch('email');
   const address1 = watch('address1');
+  const address2 = watch('address2');
   const phone = watch('phone');
+
+  // Update shipping address in store as form fields change (for discount validation)
+  useEffect(() => {
+    if (firstName && lastName && email && address1 && city && state && pincode && phone) {
+      const shippingAddress: ShippingAddress = {
+        firstName,
+        lastName,
+        email,
+        address1,
+        address2: address2 || '',
+        city,
+        state,
+        pincode,
+        phone,
+      };
+      checkoutStore.setShippingAddress(shippingAddress);
+    }
+  }, [firstName, lastName, email, address1, address2, city, state, pincode, phone]);
 
   // Memoized handlers to prevent infinite re-renders
   const handleStateChange = useCallback((newState: string) => {

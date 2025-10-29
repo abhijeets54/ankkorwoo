@@ -127,6 +127,7 @@ export const useCheckoutStore = create<CheckoutState>()(
       },
 
       setShippingAddress: (address) => {
+        console.log('📝 Shipping address saved to store:', address);
         set({ shippingAddress: address });
       },
 
@@ -218,8 +219,11 @@ export const useCheckoutStore = create<CheckoutState>()(
       },
 
       setDiscountCode: (code) => {
+        console.log('📝 Setting discount code:', { original: code, trimmed: code.trim() });
+        
         // If code is empty, clear discount completely
         if (!code || code.trim() === '') {
+          console.log('🧹 Clearing discount code');
           set({
             discountCode: '',
             discountAmount: 0,
@@ -251,32 +255,77 @@ export const useCheckoutStore = create<CheckoutState>()(
 
         console.log('🔍 Applying discount code:', {
           rawCode: discountCode,
+          trimmedCode: discountCode.trim(),
+          codeLength: discountCode.length,
           subtotal,
           shippingCost,
           hasShipping: !!selectedShipping,
           hasAddress: !!shippingAddress,
-          isLoading: isLoadingShipping
+          isLoading: isLoadingShipping,
+          addressDetails: shippingAddress ? {
+            firstName: shippingAddress.firstName,
+            lastName: shippingAddress.lastName,
+            email: shippingAddress.email,
+            hasAllFields: !!(
+              shippingAddress.firstName &&
+              shippingAddress.lastName &&
+              shippingAddress.email &&
+              shippingAddress.address1 &&
+              shippingAddress.city &&
+              shippingAddress.state &&
+              shippingAddress.pincode &&
+              shippingAddress.phone
+            )
+          } : null
         });
 
         // Validate all required information is available
-        if (!selectedShipping || !shippingAddress || isLoadingShipping) {
-          console.log('❌ Missing required info for discount');
+        if (!shippingAddress) {
+          console.log('❌ Missing shipping address');
           set({
             isDiscountValid: false,
             discountAmount: 0,
-            showDiscountError: true
+            showDiscountError: true,
+            error: 'Please fill in your shipping address first'
+          });
+          return;
+        }
+
+        // Validate all address fields are filled
+        if (!shippingAddress.firstName || !shippingAddress.lastName || !shippingAddress.email ||
+            !shippingAddress.address1 || !shippingAddress.city || !shippingAddress.state ||
+            !shippingAddress.pincode || !shippingAddress.phone) {
+          console.log('❌ Incomplete shipping address');
+          set({
+            isDiscountValid: false,
+            discountAmount: 0,
+            showDiscountError: true,
+            error: 'Please complete all shipping address fields'
+          });
+          return;
+        }
+
+        if (!selectedShipping || isLoadingShipping) {
+          console.log('❌ Missing shipping calculation');
+          set({
+            isDiscountValid: false,
+            discountAmount: 0,
+            showDiscountError: true,
+            error: 'Please wait for shipping calculation to complete'
           });
           return;
         }
 
         // Check if discount code is empty after trimming
-        if (!discountCode || discountCode.trim() === '') {
-          console.log('❌ Empty discount code');
+        const trimmedCode = discountCode.trim();
+        if (!trimmedCode) {
+          console.log('❌ Empty discount code after trim');
           set({
             isDiscountValid: false,
             discountAmount: 0,
             showDiscountError: true,
-            appliedDiscountCode: ''
+            appliedDiscountCode: '',
+            error: 'Please enter a discount code'
           });
           return;
         }
@@ -284,10 +333,14 @@ export const useCheckoutStore = create<CheckoutState>()(
         const subtotalWithShipping = subtotal + shippingCost;
 
         // Set loading state
-        set({ isLoadingShipping: true });
+        set({ isLoadingShipping: true, error: null });
 
         try {
-          console.log('🌐 Validating coupon with WooCommerce API...');
+          console.log('🌐 Validating coupon with WooCommerce API...', {
+            code: trimmedCode,
+            cartTotal: subtotalWithShipping,
+            email: shippingAddress.email
+          });
 
           // Call backend API to validate coupon with WooCommerce
           const response = await fetch('/api/validate-coupon', {
@@ -296,11 +349,15 @@ export const useCheckoutStore = create<CheckoutState>()(
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              code: discountCode.trim(),
+              code: trimmedCode,
               cartTotal: subtotalWithShipping,
               customerEmail: shippingAddress.email
             })
           });
+
+          if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}`);
+          }
 
           const data = await response.json();
 
@@ -327,7 +384,8 @@ export const useCheckoutStore = create<CheckoutState>()(
               appliedDiscountCode: data.coupon.code,
               discountType: data.coupon.discountType,
               discountPercentage: data.coupon.discountType === 'percent' ? data.coupon.amount : 0,
-              isLoadingShipping: false
+              isLoadingShipping: false,
+              error: null
             });
           } else {
             // Invalid coupon
@@ -354,7 +412,7 @@ export const useCheckoutStore = create<CheckoutState>()(
             discountType: '',
             discountPercentage: 0,
             isLoadingShipping: false,
-            error: 'Failed to validate coupon. Please try again.'
+            error: error instanceof Error ? error.message : 'Failed to validate coupon. Please try again.'
           });
           get().calculateFinalAmount();
         }
